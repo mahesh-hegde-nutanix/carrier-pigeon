@@ -86,6 +86,17 @@ export class SessionStore {
         return session;
     }
 
+    /** Removes stored sessions that have no messages, except those in keepIds.
+     * Cleans up empty sessions orphaned by a crash or an unclean shutdown. */
+    async pruneEmptySessions(keepIds: Set<string>): Promise<void> {
+        const summaries = await this.listSessions();
+        for (const s of summaries) {
+            if (s.messageCount === 0 && !keepIds.has(s.id)) {
+                await this.deleteSession(s.id);
+            }
+        }
+    }
+
     private async nextSessionName(): Promise<string> {
         const sessions = await this.listSessions();
         const existing = new Set(sessions.map(s => s.name));

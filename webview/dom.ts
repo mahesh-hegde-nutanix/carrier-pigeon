@@ -29,5 +29,12 @@ export const els = {
     actionButtons: byId<HTMLDivElement>('action-buttons-container'),
     tabNew: byId<HTMLButtonElement>('tab-new'),
     tabHistory: byId<HTMLButtonElement>('tab-history'),
-    historyClose: byId<HTMLButtonElement>('history-close')
+    historyClose: byId<HTMLButtonElement>('history-close'),
+    tabSettings: byId<HTMLButtonElement>('tab-settings'),
+    settingsOverlay: byId<HTMLDivElement>('settings-overlay'),
+    settingsClose: byId<HTMLButtonElement>('settings-close'),
+    settingsInstructions: byId<HTMLTextAreaElement>('settings-instructions'),
+    settingsTreeBytes: byId<HTMLInputElement>('settings-tree-bytes'),
+    settingsIgnore: byId<HTMLTextAreaElement>('settings-ignore'),
+    settingsSave: byId<HTMLButtonElement>('settings-save')
 };

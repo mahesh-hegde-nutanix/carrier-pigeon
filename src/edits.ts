@@ -70,7 +70,7 @@ async function resolveFile(relPath: string): Promise<vscode.Uri | undefined> {
             // Resolved by name but missing; fall through to a search.
         }
     }
-    const found = await vscode.workspace.findFiles(toFolderRelative(relPath), undefined, 1);
+    const found = await vscode.workspace.findFiles(toFolderRelative(relPath), null, 1);
     return found[0];
 }
 

@@ -24,6 +24,7 @@ export function getHtmlForWebview(webview: vscode.Webview, extensionUri: vscode.
         <div class="tabs" id="tabs"></div>
         <button class="tab-btn tab-new" id="tab-new" title="New tab">+ New tab</button>
         <button class="tab-btn tab-history" id="tab-history" title="History">&#128336;</button>
+        <button class="tab-btn tab-settings" id="tab-settings" title="Settings">&#9881;</button>
     </div>
 
     <div class="chat-history" id="chat-history"></div>
@@ -34,8 +35,8 @@ export function getHtmlForWebview(webview: vscode.Webview, extensionUri: vscode.
         <textarea id="chat-input" placeholder="Ask a question or type @ to mention a file..." rows="1"></textarea>
         <div class="input-bottom-row">
             <select id="mode-select" class="mode-selector">
-                <option value="edit" selected>EDIT MODE</option>
-                <option value="ask">ASK MODE</option>
+                <option value="edit" selected>&#9998; EDIT MODE</option>
+                <option value="ask">&#128172; ASK MODE</option>
             </select>
             <div class="action-buttons-container" id="action-buttons-container"></div>
         </div>
@@ -47,6 +48,27 @@ export function getHtmlForWebview(webview: vscode.Webview, extensionUri: vscode.
             <button class="tab-btn" id="history-close" title="Close">&#10005;</button>
         </div>
         <div class="history-list" id="history-list"></div>
+    </div>
+
+    <div class="history-overlay" id="settings-overlay">
+        <div class="history-header">
+            <span>Settings</span>
+            <button class="tab-btn" id="settings-close" title="Close">&#10005;</button>
+        </div>
+        <div class="settings-body">
+            <label class="settings-label" for="settings-instructions">Custom instructions</label>
+            <div class="settings-hint">Appended before the tool descriptions in the initial prompt.</div>
+            <textarea id="settings-instructions" class="settings-textarea" rows="6"></textarea>
+
+            <label class="settings-label" for="settings-tree-bytes">Max file tree size (bytes)</label>
+            <input id="settings-tree-bytes" class="settings-input" type="number" min="0" />
+
+            <label class="settings-label" for="settings-ignore">Ignore patterns</label>
+            <div class="settings-hint">Comma-separated regexes, matched against workspace-relative paths.</div>
+            <textarea id="settings-ignore" class="settings-textarea" rows="3"></textarea>
+
+            <button id="settings-save" class="settings-save">Save</button>
+        </div>
     </div>
 
     <script nonce="${nonce}" src="${scriptUri}"></script>

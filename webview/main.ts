@@ -14,6 +14,7 @@ import { renderAll } from './render';
 import { appendMessage } from './messagesUi';
 import { handlePaste, handleToolResults } from './toolsUi';
 import { showHistory, openLoadedSession, handleSessionDeleted } from './history';
+import { initSettings, showSettings } from './settings';
 import { autoResizeTextarea, endCopying, finishPendingCopy, initMentions, refreshMentionTrigger, updateButtons } from './mentions';
 
 window.addEventListener('message', (event: MessageEvent<HostToWebview>) => {
@@ -53,6 +54,9 @@ window.addEventListener('message', (event: MessageEvent<HostToWebview>) => {
         case 'toolResults':
             handleToolResults(message);
             break;
+        case 'settingsLoaded':
+            showSettings(message.settings);
+            break;
     }
 });
 
@@ -75,6 +79,7 @@ els.tabHistory.onclick = () => post({ type: 'requestSessions' });
 els.historyClose.onclick = () => els.historyOverlay.classList.remove('active');
 
 initMentions();
+initSettings();
 
 // Ask the extension host for the restored tab state.
 post({ type: 'ready' });

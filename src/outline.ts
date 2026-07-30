@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { filterIgnored } from './settings';
 
 // Symbol kinds worth descending into. Function/method bodies are intentionally
 // excluded so their local variables never bloat the outline.
@@ -40,9 +41,9 @@ export async function readOutline(paths: string[]): Promise<string> {
 /** Resolves a path (file, directory, or glob) to matching file URIs. */
 async function resolveFiles(path: string): Promise<vscode.Uri[]> {
     const direct = await vscode.workspace.findFiles(path, null);
-    if (direct.length > 0) return direct;
+    if (direct.length > 0) return filterIgnored(direct);
     const clean = path.replace(/\/+$/, '');
-    return vscode.workspace.findFiles(`${clean}/**`, null);
+    return filterIgnored(await vscode.workspace.findFiles(`${clean}/**`, null));
 }
 
 async function fileOutline(uri: vscode.Uri): Promise<string> {

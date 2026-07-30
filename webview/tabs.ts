@@ -46,7 +46,10 @@ export function closeTab(id: string): void {
     const sessions = getSessions();
     const idx = sessions.findIndex(s => s.id === id);
     if (idx < 0) return;
-    sessions.splice(idx, 1);
+    const [closed] = sessions.splice(idx, 1);
+    if (closed.messages.length === 0) {
+        post({ type: 'discardSession', id: closed.id });
+    }
     if (getActiveId() === id) {
         setActiveId(sessions.length ? sessions[Math.max(0, idx - 1)].id : null);
     }

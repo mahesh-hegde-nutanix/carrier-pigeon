@@ -96,7 +96,7 @@ function describe(call: ToolCall): string {
         case 'read_outline':
             return `read_outline: ${call.paths.join(', ')}`;
         case 'run_cmd':
-            return call.command;
+            return call.repo ? `[${call.repo}] ${call.command}` : call.command;
         case 'edit':
             return `edit: ${call.path}`;
     }

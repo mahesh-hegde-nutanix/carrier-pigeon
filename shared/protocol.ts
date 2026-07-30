@@ -2,6 +2,7 @@
 // Both directions are modelled as discriminated unions on `type`.
 
 import { ChatMode, Session, SessionSummary } from './session';
+import { AppSettings } from './settings';
 import { ToolCall } from './toolParser';
 
 // ---- webview -> host --------------------------------------------------------
@@ -55,6 +56,12 @@ export interface DeleteSessionMsg {
     id: string;
 }
 
+/** Discards a closed empty session; unlike deleteSession it triggers no UI refresh. */
+export interface DiscardSessionMsg {
+    type: 'discardSession';
+    id: string;
+}
+
 export interface ExecuteToolsMsg {
     type: 'executeTools';
     calls: ToolCall[];
@@ -68,6 +75,15 @@ export interface CopyTextMsg {
     text: string;
 }
 
+export interface RequestSettingsMsg {
+    type: 'requestSettings';
+}
+
+export interface UpdateSettingsMsg {
+    type: 'updateSettings';
+    settings: AppSettings;
+}
+
 export type WebviewToHost =
     | ReadyMsg
     | RequestFilesMsg
@@ -79,8 +95,11 @@ export type WebviewToHost =
     | RequestSessionsMsg
     | LoadSessionMsg
     | DeleteSessionMsg
+    | DiscardSessionMsg
     | ExecuteToolsMsg
-    | CopyTextMsg;
+    | CopyTextMsg
+    | RequestSettingsMsg
+    | UpdateSettingsMsg;
 
 // ---- host -> webview --------------------------------------------------------
 
@@ -135,6 +154,11 @@ export interface ToolResultsMsg {
     errorReport?: string;
 }
 
+export interface SettingsLoadedMsg {
+    type: 'settingsLoaded';
+    settings: AppSettings;
+}
+
 export type HostToWebview =
     | InitStateMsg
     | SessionCreatedMsg
@@ -144,4 +168,5 @@ export type HostToWebview =
     | FileListMsg
     | ContextCopiedMsg
     | PastedMessageMsg
-    | ToolResultsMsg;
+    | ToolResultsMsg
+    | SettingsLoadedMsg;

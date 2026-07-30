@@ -7,6 +7,7 @@ import { ChatMode, Session } from '../shared/session';
 import { logTiming, timed } from './timing';
 import { runTools } from './toolRunner';
 import { ToolCall } from '../shared/toolParser';
+import { getSettings, loadSettings, saveSettings } from './settings';
 
 export const CHAT_VIEW_ID = 'carrierPigeon.chatView';
 
@@ -52,6 +53,7 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
     private async handleMessage(data: WebviewToHost): Promise<void> {
         switch (data.type) {
             case 'ready':
+                await loadSettings();
                 await this.sendInitState();
                 break;
             case 'requestFiles': {
@@ -99,12 +101,21 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
                 this.post({ type: 'sessionDeleted', id: data.id, sessions });
                 break;
             }
+            case 'discardSession':
+                await this.store.deleteSession(data.id);
+                break;
             case 'executeTools':
                 await this.executeTools(data.calls, data.sessionFiles);
                 break;
             case 'copyText':
                 await vscode.env.clipboard.writeText(data.text);
                 vscode.window.setStatusBarMessage('$(clippy) Carrier Pigeon: errors copied', 3000);
+                break;
+            case 'requestSettings':
+                this.post({ type: 'settingsLoaded', settings: getSettings() });
+                break;
+            case 'updateSettings':
+                await saveSettings(data.settings);
                 break;
         }
     }
@@ -149,6 +160,9 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         const state = this.store.getTabState();
         const openSessions: Session[] = [];
         let activeId = state?.activeId ?? null;
+
+        const openIds = new Set(state?.ids ?? []);
+        await this.store.pruneEmptySessions(openIds);
 
         if (state && Array.isArray(state.ids)) {
             for (const id of state.ids) {

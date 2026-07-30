@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-import { EditCall, ReadFilesCall, ToolCall } from '../shared/toolParser';
-import { fileBlock, readFileText, resolveWorkspacePath, toFolderRelative } from './context';
+import { EditCall, ReadFilesCall, RunCmdCall, ToolCall } from '../shared/toolParser';
+import { fileBlock, readFileText, resolveRepoUri, resolveWorkspacePath, toFolderRelative } from './context';
 import { readOutline } from './outline';
 import { runCommand } from './terminal';
 import { applyEdits } from './edits';
@@ -26,7 +26,7 @@ export async function runTools(calls: ToolCall[], sessionFiles: string[]): Promi
                 results.push(`## Outline\n${await readOutline(call.paths)}`);
                 break;
             case 'run_cmd':
-                results.push(`## Command\n\`\`\`\n${await runCommand(call.command)}\n\`\`\``);
+                results.push(await runCmdResult(call));
                 break;
             case 'edit':
                 edits.push(call);
@@ -39,6 +39,18 @@ export async function runTools(calls: ToolCall[], sessionFiles: string[]): Promi
         resultsText: results.length > 0 ? results.join('\n\n') : undefined,
         errorReport
     };
+}
+
+async function runCmdResult(call: RunCmdCall): Promise<string> {
+    if (!call.repo) {
+        return `## Command\n\`\`\`\n${await runCommand(call.command)}\n\`\`\``;
+    }
+    const cwd = resolveRepoUri(call.repo);
+    if (!cwd) {
+        const notice = `(unknown repo '${call.repo}': running from workspace root)`;
+        return `## Command\n\`\`\`\n${notice}\n${await runCommand(call.command)}\n\`\`\``;
+    }
+    return `## Command (${call.repo})\n\`\`\`\n${await runCommand(call.command, cwd)}\n\`\`\``;
 }
 
 async function readFilesResult(call: ReadFilesCall): Promise<string> {
@@ -71,5 +83,5 @@ async function resolveReadFiles(pattern: string): Promise<vscode.Uri[]> {
             // Not a plain file (e.g. a glob pattern); fall through to search.
         }
     }
-    return vscode.workspace.findFiles(toFolderRelative(pattern), undefined);
+    return vscode.workspace.findFiles(toFolderRelative(pattern), null);
 }

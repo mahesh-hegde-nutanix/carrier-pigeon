@@ -18,6 +18,8 @@ export interface ReadOutlineCall {
 export interface RunCmdCall {
     tool: 'run_cmd';
     command: string;
+    // Optional workspace folder name ('[repo]') to run the command from.
+    repo?: string;
 }
 
 export interface EditCall {
@@ -118,7 +120,13 @@ function parseJsonCall(line: string): ToolCall | undefined {
         case 'read_outline':
             return isStringArray(record.paths) ? { tool: 'read_outline', paths: record.paths } : undefined;
         case 'run_cmd':
-            return typeof record.command === 'string' ? { tool: 'run_cmd', command: record.command } : undefined;
+            return typeof record.command === 'string'
+                ? {
+                    tool: 'run_cmd',
+                    command: record.command,
+                    repo: typeof record.repo === 'string' ? record.repo : undefined
+                }
+                : undefined;
         default:
             return undefined;
     }
