@@ -1,27 +1,32 @@
 import { els, post } from './dom';
+import { WorkspaceSymbol } from '../shared/protocol';
 import { getActive, getMentionedFiles, getSkills, getWorkspaceFiles, saveActive } from './state';
 
 interface MentionState {
     start: number;
     end: number;
     query: string;
-    trigger: '@' | '/';
+    trigger: '@' | '/' | '#';
 }
 
 interface CompletionItem {
     value: string;
     label: string;
     detail: string;
-    kind: 'file' | 'skill';
+    kind: 'file' | 'skill' | 'symbol';
+    insertText?: string;
 }
 
 const MAX_TEXTAREA_HEIGHT = 120;
 const MAX_MENTION_RESULTS = 50;
+const SYMBOL_SEARCH_DELAY_MS = 150;
 
 let filteredItems: CompletionItem[] = [];
 let currentMentionState: MentionState | null = null;
 let selectedPopupIndex = -1;
-let activeTrigger: '@' | '/' | null = null;
+let activeTrigger: '@' | '/' | '#' | null = null;
+let symbolSearchTimer: ReturnType<typeof setTimeout> | undefined;
+let latestSymbolRequestId = 0;
 // True while the host is building the context payload (potentially slow FS work).
 let copying = false;
 let copyingSessionId: string | null = null;
@@ -159,14 +164,15 @@ function setInputBlocked(blocked: boolean): void {
 function checkMentionTrigger(): void {
     const val = els.chatInput.value;
     const cursorPos = els.chatInput.selectionStart;
-    const match = val.substring(0, cursorPos).match(/(?:^|\s)([@/])([^\s]*)$/);
+    const match = val.substring(0, cursorPos).match(/(?:^|\s)([@/#])([^\s]*)$/);
 
     if (!match) {
         activeTrigger = null;
+        cancelSymbolSearch();
         hidePopup();
         return;
     }
-    const trigger = match[1] as '@' | '/';
+    const trigger = match[1] as '@' | '/' | '#';
 
     // Re-fetch the file list once per mention token so files created since the
     // last mention (the host list is cached and invalidated on create/delete)
@@ -184,6 +190,11 @@ function checkMentionTrigger(): void {
         trigger
     };
 
+    if (trigger === '#') {
+        scheduleSymbolSearch(query);
+        return;
+    }
+    cancelSymbolSearch();
     const candidates = trigger === '@' ? fileCompletionItems() : skillCompletionItems();
 
     if (query) {
@@ -212,6 +223,50 @@ export function refreshMentionTrigger(): void {
     els.chatInput.dispatchEvent(new Event('input'));
 }
 
+/** Displays results for the latest in-progress workspace symbol search. */
+export function showSymbolResults(requestId: number, symbols: WorkspaceSymbol[]): void {
+    if (
+        requestId !== latestSymbolRequestId ||
+        currentMentionState?.trigger !== '#'
+    ) {
+        return;
+    }
+    filteredItems = symbols.slice(0, MAX_MENTION_RESULTS).map(symbol => ({
+        value: symbol.name,
+        label: symbol.name,
+        detail: symbol.uri,
+        kind: 'symbol',
+        insertText: `@${symbol.path} (${symbol.name})`
+    }));
+    if (filteredItems.length > 0) {
+        showPopup();
+    } else {
+        hidePopup();
+    }
+}
+
+function scheduleSymbolSearch(query: string): void {
+    cancelSymbolSearch();
+    filteredItems = [];
+    els.mentionPopup.classList.remove('active');
+    selectedPopupIndex = -1;
+    if (!query) return;
+
+    const requestId = ++latestSymbolRequestId;
+    symbolSearchTimer = setTimeout(() => {
+        post({ type: 'requestSymbols', requestId, query });
+        symbolSearchTimer = undefined;
+    }, SYMBOL_SEARCH_DELAY_MS);
+}
+
+function cancelSymbolSearch(): void {
+    if (symbolSearchTimer !== undefined) {
+        clearTimeout(symbolSearchTimer);
+        symbolSearchTimer = undefined;
+    }
+    latestSymbolRequestId++;
+}
+
 function showPopup(): void {
     els.mentionPopup.innerHTML = '';
     selectedPopupIndex = 0;
@@ -236,7 +291,7 @@ function showPopup(): void {
         }
         div.onmousedown = (e) => {
             e.preventDefault();
-            insertMention(item.value);
+            insertMention(item);
         };
         els.mentionPopup.appendChild(div);
     });
@@ -249,13 +304,14 @@ function hidePopup(): void {
     selectedPopupIndex = -1;
 }
 
-function insertMention(value: string): void {
+function insertMention(item: CompletionItem): void {
     if (!currentMentionState) return;
     const val = els.chatInput.value;
     const before = val.substring(0, currentMentionState.start);
     const after = val.substring(currentMentionState.end);
-    els.chatInput.value = before + currentMentionState.trigger + value + ' ' + after;
-    const newCursorPos = currentMentionState.start + value.length + 2;
+    const inserted = item.insertText ?? currentMentionState.trigger + item.value;
+    els.chatInput.value = before + inserted + ' ' + after;
+    const newCursorPos = currentMentionState.start + inserted.length + 1;
     els.chatInput.setSelectionRange(newCursorPos, newCursorPos);
     hidePopup();
     autoResizeTextarea();
@@ -283,7 +339,7 @@ function onKeydown(e: KeyboardEvent): void {
         items[selectedPopupIndex].scrollIntoView({ block: 'nearest' });
     } else if (e.key === 'Enter' || e.key === 'Tab') {
         e.preventDefault();
-        if (filteredItems[selectedPopupIndex]) insertMention(filteredItems[selectedPopupIndex].value);
+        if (filteredItems[selectedPopupIndex]) insertMention(filteredItems[selectedPopupIndex]);
     } else if (e.key === 'Escape') {
         e.preventDefault();
         hidePopup();

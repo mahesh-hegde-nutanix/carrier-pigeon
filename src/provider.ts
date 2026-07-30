@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { SessionStore } from './sessionStore';
 import { buildContextPayload, RuleFilesCache, WorkspaceFilesCache } from './context';
 import { getHtmlForWebview } from './html';
-import { HostToWebview, WebviewToHost } from '../shared/protocol';
+import { HostToWebview, WebviewToHost, WorkspaceSymbol } from '../shared/protocol';
 import { ChatMode, Session } from '../shared/session';
 import { logTiming, timed } from './timing';
 import { runTools } from './toolRunner';
@@ -11,6 +11,7 @@ import { getSettings, loadSettings, saveSettings } from './settings';
 import { SkillRegistry } from './skills';
 
 export const CHAT_VIEW_ID = 'carrierPigeon.chatView';
+const MAX_SYMBOL_RESULTS = 50;
 
 /** Backs the Carrier Pigeon chat webview: renders it and bridges its messages. */
 export class AIChatViewProvider implements vscode.WebviewViewProvider {
@@ -64,6 +65,33 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
                 console.log(`[CarrierPigeon][timing] requestFiles.fileCount: ${uris.length}`);
                 const files = uris.map(uri => vscode.workspace.asRelativePath(uri));
                 this.post({ type: 'fileList', purpose: data.purpose, files });
+                break;
+            }
+            case 'requestSymbols': {
+                const symbols = await vscode.commands.executeCommand<vscode.SymbolInformation[]>(
+                    'vscode.executeWorkspaceSymbolProvider',
+                    data.query
+                ) ?? [];
+                const workspaceSymbols: WorkspaceSymbol[] = [];
+                const seen = new Set<string>();
+                for (const symbol of symbols) {
+                    if (workspaceSymbols.length >= MAX_SYMBOL_RESULTS) break;
+                    if (!vscode.workspace.getWorkspaceFolder(symbol.location.uri)) continue;
+                    const path = vscode.workspace.asRelativePath(symbol.location.uri);
+                    const key = `${symbol.name}\0${path}`;
+                    if (seen.has(key)) continue;
+                    seen.add(key);
+                    workspaceSymbols.push({
+                        name: symbol.name,
+                        path,
+                        uri: symbol.location.uri.toString()
+                    });
+                }
+                this.post({
+                    type: 'symbolList',
+                    requestId: data.requestId,
+                    symbols: workspaceSymbols
+                });
                 break;
             }
             case 'requestContextCopy':

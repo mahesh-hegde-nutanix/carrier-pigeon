@@ -42,7 +42,7 @@ export function getHtmlForWebview(webview: vscode.Webview, extensionUri: vscode.
     <div class="input-area">
         <div class="pending-tools" id="pending-tools"></div>
         <div class="mention-popup" id="mention-popup"></div>
-        <textarea id="chat-input" placeholder="Ask a question, @ mention a file, or / invoke a skill..." rows="1"></textarea>
+        <textarea id="chat-input" placeholder="Ask a question, @ mention a file, # find a symbol, or / invoke a skill..." rows="1"></textarea>
         <div class="input-bottom-row">
             <select id="mode-select" class="mode-selector">
                 <option value="edit" selected>&#9998; EDIT MODE</option>

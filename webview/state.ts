@@ -64,5 +64,12 @@ export function saveActive(): void {
 
 /** Returns workspace files explicitly @-mentioned in the given text. */
 export function getMentionedFiles(text: string): string[] {
-    return workspaceFiles.filter(file => text.includes('@' + file));
+    return workspaceFiles.filter(file => {
+        const mention = new RegExp(`(?:^|\\s)@${escapeRegExp(file)}(?=$|\\s)`);
+        return mention.test(text);
+    });
+}
+
+function escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

@@ -17,7 +17,7 @@ import { appendMessage, updateMessageDom } from './messagesUi';
 import { handlePaste, handleToolResults } from './toolsUi';
 import { showHistory, openLoadedSession, handleSessionDeleted } from './history';
 import { initSettings, showSettings } from './settings';
-import { autoResizeTextarea, endCopying, finishPendingCopy, initMentions, prefetchWorkspaceFiles, refreshMentionTrigger, updateButtons } from './mentions';
+import { autoResizeTextarea, endCopying, finishPendingCopy, initMentions, prefetchWorkspaceFiles, refreshMentionTrigger, showSymbolResults, updateButtons } from './mentions';
 
 let currentStreamMessage: { text: string, dom: HTMLElement } | null = null;
 
@@ -54,6 +54,9 @@ window.addEventListener('message', (event: MessageEvent<HostToWebview>) => {
             } else {
                 refreshMentionTrigger();
             }
+            break;
+        case 'symbolList':
+            showSymbolResults(message.requestId, message.symbols);
             break;
         case 'contextCopied':
             onContextCopied(message.sessionId, message.text);

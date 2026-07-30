@@ -17,6 +17,12 @@ export interface RequestFilesMsg {
     purpose: FileListPurpose;
 }
 
+export interface RequestSymbolsMsg {
+    type: 'requestSymbols';
+    requestId: number;
+    query: string;
+}
+
 export interface RequestContextCopyMsg {
     type: 'requestContextCopy';
     sessionId: string;
@@ -90,6 +96,7 @@ export interface UpdateSettingsMsg {
 export type WebviewToHost =
     | ReadyMsg
     | RequestFilesMsg
+    | RequestSymbolsMsg
     | RequestContextCopyMsg
     | RequestPasteMsg
     | CreateSessionMsg
@@ -142,6 +149,18 @@ export interface FileListMsg {
     files: string[];
 }
 
+export interface WorkspaceSymbol {
+    name: string;
+    path: string;
+    uri: string;
+}
+
+export interface SymbolListMsg {
+    type: 'symbolList';
+    requestId: number;
+    symbols: WorkspaceSymbol[];
+}
+
 export interface ContextCopiedMsg {
     type: 'contextCopied';
     sessionId: string;
@@ -179,6 +198,7 @@ export type HostToWebview =
     | SessionLoadedMsg
     | SessionDeletedMsg
     | FileListMsg
+    | SymbolListMsg
     | ContextCopiedMsg
     | PastedMessageMsg
     | ToolResultsMsg
