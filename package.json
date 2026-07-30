@@ -2,6 +2,7 @@
   "name": "carrier-pigeon",
   "displayName": "Carrier Pigeon AI",
   "version": "0.0.1",
+  "repository": "https://github.com/mahesh-hegde-nutanix/carrier-pigeon",
   "engines": {
     "vscode": "^1.93.0"
   },

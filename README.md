@@ -17,7 +17,7 @@ The name is an allusion to [RFC 2549: IP Over Avian Carriers](https://www.rfc-ed
     Or
 
     ```
-    Update @my_pkg/api_client.go to make PATCH requests with only changed fields.
+    Update @my_pkg/api_client.go update method to make PATCH requests with only changed fields.
     ```
 
 * Click copy context, context will be copied to your clipboard
@@ -32,3 +32,20 @@ The name is an allusion to [RFC 2549: IP Over Avian Carriers](https://www.rfc-ed
 * If the response contains any tool calls, then you will be prompted whether to run them.
 
 * **Note: Select AGENT MODE instead of ASK MODE for the chat to make changes in your files**.
+
+## Development / Installation stuff
+
+Install Node 24. Eg: on RH-derived Linux systems
+
+```bash
+sudo dnf module enable nodejs:24
+sudo dnf install nodejs
+node --version # ensure 24.x
+```
+
+Create extension package
+
+```bash
+npm install -g @vscode/vsce
+
+```
