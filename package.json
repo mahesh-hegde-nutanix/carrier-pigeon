@@ -3,9 +3,21 @@
   "displayName": "Carrier Pigeon AI",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.80.0"
+    "vscode": "^1.93.0"
   },
-  "main": "./extension.js",
+  "main": "./dist/extension.js",
+  "scripts": {
+    "compile": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "check": "tsc --noEmit",
+    "vscode:prepublish": "node esbuild.mjs --production"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "@types/vscode": "^1.93.0",
+    "esbuild": "^0.28.1",
+    "typescript": "^7.0.2"
+  },
   "contributes": {
     "viewsContainers": {
       "activitybar": [
@@ -25,5 +37,9 @@
         }
       ]
     }
+  },
+  "dependencies": {
+    "dompurify": "^3.4.12",
+    "marked": "^18.0.7"
   }
 }

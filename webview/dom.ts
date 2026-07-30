@@ -1,0 +1,33 @@
+import { WebviewToHost } from '../shared/protocol';
+
+interface VsCodeApi {
+    postMessage(msg: WebviewToHost): void;
+}
+
+declare function acquireVsCodeApi(): VsCodeApi;
+
+const vscodeApi = acquireVsCodeApi();
+
+/** Sends a typed message to the extension host. */
+export function post(msg: WebviewToHost): void {
+    vscodeApi.postMessage(msg);
+}
+
+function byId<T extends HTMLElement>(id: string): T {
+    return document.getElementById(id) as T;
+}
+
+export const els = {
+    chatHistory: byId<HTMLDivElement>('chat-history'),
+    chatInput: byId<HTMLTextAreaElement>('chat-input'),
+    pendingTools: byId<HTMLDivElement>('pending-tools'),
+    mentionPopup: byId<HTMLDivElement>('mention-popup'),
+    modeSelect: byId<HTMLSelectElement>('mode-select'),
+    tabs: byId<HTMLDivElement>('tabs'),
+    historyOverlay: byId<HTMLDivElement>('history-overlay'),
+    historyList: byId<HTMLDivElement>('history-list'),
+    actionButtons: byId<HTMLDivElement>('action-buttons-container'),
+    tabNew: byId<HTMLButtonElement>('tab-new'),
+    tabHistory: byId<HTMLButtonElement>('tab-history'),
+    historyClose: byId<HTMLButtonElement>('history-close')
+};
