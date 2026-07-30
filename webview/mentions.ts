@@ -17,6 +17,7 @@ let selectedPopupIndex = -1;
 let mentionActive = false;
 // True while the host is building the context payload (potentially slow FS work).
 let copying = false;
+let copyingSessionId: string | null = null;
 // A copy is queued, waiting on a fresh file list so pasted @mentions resolve.
 let pendingCopy = false;
 
@@ -39,6 +40,11 @@ export function initMentions(): void {
     els.chatInput.addEventListener('keydown', onKeydown);
 }
 
+/** Starts a background workspace file load so @mentions are ready on first use. */
+export function prefetchWorkspaceFiles(): void {
+    post({ type: 'requestFiles', purpose: 'prefetch' });
+}
+
 export function updateButtons(): void {
     const active = getActive();
     els.actionButtons.innerHTML = '';
@@ -55,8 +61,22 @@ export function updateButtons(): void {
 }
 
 /** Clears the copy-in-progress state once the host responds. */
-export function endCopying(): void {
+export function endCopying(sessionId: string): void {
+    if (copyingSessionId !== sessionId) return;
     copying = false;
+    copyingSessionId = null;
+    setInputBlocked(false);
+    updateButtons();
+}
+
+/** Unblocks the UI if the copied session is closed before the host responds. */
+export function cancelCopyForSession(sessionId: string): void {
+    if (copyingSessionId !== sessionId) return;
+    pendingCopy = false;
+    copying = false;
+    copyingSessionId = null;
+    setInputBlocked(false);
+    updateButtons();
 }
 
 export function autoResizeTextarea(): void {
@@ -73,8 +93,10 @@ function performCopy(): void {
     // completed in finishPendingCopy once the list arrives.
     pendingCopy = true;
     copying = true;
+    copyingSessionId = active.id;
+    setInputBlocked(true);
     updateButtons();
-    post({ type: 'requestFiles' });
+    post({ type: 'requestFiles', purpose: 'copy' });
 }
 
 /** Completes a copy queued by performCopy, after the file list has refreshed. */
@@ -84,8 +106,10 @@ export function finishPendingCopy(): void {
 
     const active = getActive();
     const text = els.chatInput.value.trim();
-    if (!active || !text) {
+    if (!active || active.id !== copyingSessionId || !text) {
         copying = false;
+        copyingSessionId = null;
+        setInputBlocked(false);
         updateButtons();
         return;
     }
@@ -95,6 +119,7 @@ export function finishPendingCopy(): void {
     );
     post({
         type: 'requestContextCopy',
+        sessionId: active.id,
         text,
         files: newMentioned,
         isInitial: !active.initialContextCopied,
@@ -122,6 +147,10 @@ function createLoadingButton(): HTMLButtonElement {
     return btn;
 }
 
+function setInputBlocked(blocked: boolean): void {
+    els.chatInput.disabled = blocked;
+}
+
 function checkMentionTrigger(): void {
     const val = els.chatInput.value;
     const cursorPos = els.chatInput.selectionStart;
@@ -138,7 +167,7 @@ function checkMentionTrigger(): void {
     // still appear.
     if (!mentionActive) {
         mentionActive = true;
-        post({ type: 'requestFiles' });
+        post({ type: 'requestFiles', purpose: 'mention' });
     }
     const query = match[1].toLowerCase();
     currentMentionState = {

@@ -7,6 +7,7 @@ import {
     setActiveId
 } from './state';
 import { renderAll } from './render';
+import { cancelCopyForSession } from './mentions';
 
 export function showHistory(sessions: SessionSummary[]): void {
     els.historyList.innerHTML = '';
@@ -70,6 +71,7 @@ export function openLoadedSession(session: Session): void {
 }
 
 export function handleSessionDeleted(id: string, sessions: SessionSummary[]): void {
+    cancelCopyForSession(id);
     const open = getSessions();
     const idx = open.findIndex(s => s.id === id);
     if (idx >= 0) {

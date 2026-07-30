@@ -13,6 +13,11 @@ export function post(msg: WebviewToHost): void {
     vscodeApi.postMessage(msg);
 }
 
+/** Shows the webview after CSS and initial state have been applied. */
+export function revealBooted(): void {
+    document.body.classList.remove('booting');
+}
+
 function byId<T extends HTMLElement>(id: string): T {
     return document.getElementById(id) as T;
 }

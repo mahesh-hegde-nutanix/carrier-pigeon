@@ -14,12 +14,22 @@ export function getHtmlForWebview(webview: vscode.Webview, extensionUri: vscode.
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style nonce="${nonce}">
+        body {
+            margin: 0;
+            background-color: var(--vscode-editor-background);
+            color: var(--vscode-foreground);
+        }
+        body.booting > * {
+            visibility: hidden;
+        }
+    </style>
     <link href="${styleUri}" rel="stylesheet">
     <title>AI Chat</title>
 </head>
-<body>
+<body class="booting">
     <div class="tab-bar" id="tab-bar">
         <div class="tabs" id="tabs"></div>
         <button class="tab-btn tab-new" id="tab-new" title="New tab">+ New tab</button>

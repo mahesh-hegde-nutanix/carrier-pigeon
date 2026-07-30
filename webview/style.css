@@ -108,6 +108,11 @@ body, html {
     font-size: 1.05em;
 }
 
+.tab-settings {
+    font-size: 1.1em;
+    line-height: 1;
+}
+
 .chat-history {
     flex: 1;
     overflow-y: auto;
@@ -305,7 +310,7 @@ textarea:focus {
     color: var(--vscode-dropdown-foreground);
     border: 1px solid var(--vscode-dropdown-border);
     padding: 6px 12px;
-    border-radius: 14px;
+    border-radius: 8px;
     font-family: inherit;
     font-size: 0.85em;
     font-weight: 500;

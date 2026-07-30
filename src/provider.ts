@@ -60,11 +60,11 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
                 const uris = await timed('requestFiles.scan', () => this.filesCache.get());
                 console.log(`[CarrierPigeon][timing] requestFiles.fileCount: ${uris.length}`);
                 const files = uris.map(uri => vscode.workspace.asRelativePath(uri));
-                this.post({ type: 'fileList', files });
+                this.post({ type: 'fileList', purpose: data.purpose, files });
                 break;
             }
             case 'requestContextCopy':
-                await this.copyContext(data.text, data.files, data.isInitial, data.mode);
+                await this.copyContext(data.sessionId, data.text, data.files, data.isInitial, data.mode);
                 break;
             case 'requestPaste': {
                 const value = await vscode.env.clipboard.readText();
@@ -137,6 +137,7 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     private async copyContext(
+        sessionId: string,
         text: string,
         files: string[],
         isInitial: boolean,
@@ -152,7 +153,7 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
             '$(clippy) Carrier Pigeon: context copied to clipboard',
             3000
         );
-        this.post({ type: 'contextCopied', text });
+        this.post({ type: 'contextCopied', sessionId, text });
         logTiming('copyContext total', start);
     }
 

@@ -13,10 +13,12 @@ export interface ReadyMsg {
 
 export interface RequestFilesMsg {
     type: 'requestFiles';
+    purpose: FileListPurpose;
 }
 
 export interface RequestContextCopyMsg {
     type: 'requestContextCopy';
+    sessionId: string;
     text: string;
     files: string[];
     isInitial: boolean;
@@ -103,6 +105,8 @@ export type WebviewToHost =
 
 // ---- host -> webview --------------------------------------------------------
 
+export type FileListPurpose = 'prefetch' | 'mention' | 'copy';
+
 export interface InitStateMsg {
     type: 'initState';
     sessions: Session[];
@@ -132,11 +136,13 @@ export interface SessionDeletedMsg {
 
 export interface FileListMsg {
     type: 'fileList';
+    purpose: FileListPurpose;
     files: string[];
 }
 
 export interface ContextCopiedMsg {
     type: 'contextCopied';
+    sessionId: string;
     text: string;
 }
 

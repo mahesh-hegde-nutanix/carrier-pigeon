@@ -8,6 +8,7 @@ import {
     setActiveId
 } from './state';
 import { renderAll } from './render';
+import { cancelCopyForSession } from './mentions';
 
 export function renderTabs(): void {
     const activeId = getActiveId();
@@ -43,6 +44,7 @@ export function switchTab(id: string): void {
 }
 
 export function closeTab(id: string): void {
+    cancelCopyForSession(id);
     const sessions = getSessions();
     const idx = sessions.findIndex(s => s.id === id);
     if (idx < 0) return;

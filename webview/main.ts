@@ -1,6 +1,6 @@
 import './style.css';
 import { HostToWebview } from '../shared/protocol';
-import { els, post } from './dom';
+import { els, post, revealBooted } from './dom';
 import {
     getActive,
     getMentionedFiles,
@@ -15,7 +15,7 @@ import { appendMessage } from './messagesUi';
 import { handlePaste, handleToolResults } from './toolsUi';
 import { showHistory, openLoadedSession, handleSessionDeleted } from './history';
 import { initSettings, showSettings } from './settings';
-import { autoResizeTextarea, endCopying, finishPendingCopy, initMentions, refreshMentionTrigger, updateButtons } from './mentions';
+import { autoResizeTextarea, endCopying, finishPendingCopy, initMentions, prefetchWorkspaceFiles, refreshMentionTrigger, updateButtons } from './mentions';
 
 window.addEventListener('message', (event: MessageEvent<HostToWebview>) => {
     const message = event.data;
@@ -24,6 +24,8 @@ window.addEventListener('message', (event: MessageEvent<HostToWebview>) => {
             setSessions(message.sessions);
             setActiveId(message.activeId);
             renderAll();
+            revealBooted();
+            prefetchWorkspaceFiles();
             break;
         case 'sessionCreated':
             getSessions().push(message.session);
@@ -42,11 +44,14 @@ window.addEventListener('message', (event: MessageEvent<HostToWebview>) => {
             break;
         case 'fileList':
             setWorkspaceFiles(message.files);
-            finishPendingCopy();
-            refreshMentionTrigger();
+            if (message.purpose === 'copy') {
+                finishPendingCopy();
+            } else {
+                refreshMentionTrigger();
+            }
             break;
         case 'contextCopied':
-            onContextCopied(message.text);
+            onContextCopied(message.sessionId, message.text);
             break;
         case 'pastedMessage':
             if (message.value) handlePaste(message.value);
@@ -60,10 +65,10 @@ window.addEventListener('message', (event: MessageEvent<HostToWebview>) => {
     }
 });
 
-function onContextCopied(text: string): void {
-    endCopying();
+function onContextCopied(sessionId: string, text: string): void {
+    endCopying(sessionId);
     const active = getActive();
-    if (!active) return;
+    if (!active || active.id !== sessionId) return;
     getMentionedFiles(text).forEach(f => {
         if (!active.mentionedFiles.includes(f)) active.mentionedFiles.push(f);
     });
