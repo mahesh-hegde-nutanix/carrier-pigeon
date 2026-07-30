@@ -1,0 +1,29 @@
+{
+  "name": "carrier-pigeon",
+  "displayName": "Carrier Pigeon AI",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "main": "./extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "carrier-pigeon-chat",
+          "title": "Carrier Pigeon for AI",
+          "icon": "$(tools)"
+        }
+      ]
+    },
+    "views": {
+      "carrier-pigeon-chat": [
+        {
+          "type": "webview",
+          "id": "carrierPigeon.chatView",
+          "name": "Chat View"
+        }
+      ]
+    }
+  }
+}
