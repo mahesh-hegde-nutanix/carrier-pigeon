@@ -14,7 +14,7 @@ import { renderAll } from './render';
 import { appendMessage } from './messagesUi';
 import { handlePaste, handleToolResults } from './toolsUi';
 import { showHistory, openLoadedSession, handleSessionDeleted } from './history';
-import { autoResizeTextarea, endCopying, initMentions, refreshMentionTrigger, updateButtons } from './mentions';
+import { autoResizeTextarea, endCopying, finishPendingCopy, initMentions, refreshMentionTrigger, updateButtons } from './mentions';
 
 window.addEventListener('message', (event: MessageEvent<HostToWebview>) => {
     const message = event.data;
@@ -41,6 +41,7 @@ window.addEventListener('message', (event: MessageEvent<HostToWebview>) => {
             break;
         case 'fileList':
             setWorkspaceFiles(message.files);
+            finishPendingCopy();
             refreshMentionTrigger();
             break;
         case 'contextCopied':

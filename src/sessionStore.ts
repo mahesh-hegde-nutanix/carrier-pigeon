@@ -77,7 +77,7 @@ export class SessionStore {
             name: await this.nextSessionName(),
             createdAt: now,
             updatedAt: now,
-            mode: 'ask',
+            mode: 'edit',
             initialContextCopied: false,
             mentionedFiles: [],
             messages: []

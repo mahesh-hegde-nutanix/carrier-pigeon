@@ -19,11 +19,19 @@ Highlight the question line in bold and mention the possible choices if applicab
 
 Git repository roots in the file trees will be marked '[GIT]'.
 gitignored files will not be shown by the trees - use find/ls if you must.
+
+Reminder: these files / repos are not on your system. The user is communicating via a chat.
+
+Provide the tool calls in format described so that the user can execute them and relay the results.
 `;
 
 const EDIT_MODE_PROMPT = `
 Write concise and robust code. Consider all edge cases.
+
 If you are unsure about some symbols, ask to read them first.
+
+If the user clearly didn't ask to write code, then just answer the user's question at the end. 
+No need to produce edits in that case.
 
 ### File writes and updates
 
@@ -144,9 +152,11 @@ export class WorkspaceFilesCache implements vscode.Disposable {
 
     get(): Thenable<vscode.Uri[]> {
         if (this.cached === undefined) {
-            // Passing null for exclude respects .gitignore. The promise is
-            // cached so concurrent callers share a single scan.
-            this.cached = vscode.workspace.findFiles('**/*', null);
+            // Passing undefined applies the default files.exclude/search.exclude
+            // settings (which hide .git, node_modules, etc.). findFiles does not
+            // honor .gitignore. The promise is cached so concurrent callers share
+            // a single scan.
+            this.cached = vscode.workspace.findFiles('**/*', undefined);
         }
         return this.cached;
     }
@@ -192,12 +202,18 @@ async function getGitRoots(): Promise<GitRoots> {
     if (!ext) return roots;
     try {
         const git = (await ext.activate()).getAPI(1);
+        const singleRoot = (vscode.workspace.workspaceFolders ?? []).length === 1;
         for (const repo of git.repositories) {
-            const rel = vscode.workspace.asRelativePath(repo.rootUri);
-            if (rel === '' || rel.startsWith('/')) {
-                roots.rootIsRepo = true;
+            const folder = vscode.workspace.getWorkspaceFolder(repo.rootUri);
+            // Skip repos outside the workspace (e.g. an enclosing parent repo).
+            if (!folder) continue;
+            if (repo.rootUri.toString() === folder.uri.toString()) {
+                // The repo root is a workspace folder root: it's the tree root in
+                // single-root, or a top-level node (named by folder) in multi-root.
+                if (singleRoot) roots.rootIsRepo = true;
+                else roots.dirs.add(folder.name);
             } else {
-                roots.dirs.add(rel);
+                roots.dirs.add(vscode.workspace.asRelativePath(repo.rootUri));
             }
         }
     } catch (e) {
@@ -339,7 +355,7 @@ async function getRuleFilesContext(): Promise<string> {
         });
 
         const uris = await timed('rules.findFiles', () =>
-            vscode.workspace.findFiles(`{${globs.join(',')}}`, null)
+            vscode.workspace.findFiles(`{${globs.join(',')}}`, undefined)
         );
         const buffer: string[] = [];
 
@@ -389,23 +405,53 @@ interface MentionedFileContent {
 }
 
 /**
- * Reads a workspace-relative mentioned file. Resolves the path against the
- * workspace folders directly (fast); only falls back to a search if that misses
- * (e.g. multi-root paths that include the folder name).
+ * Reads a workspace-relative mentioned file. Resolves the path directly against
+ * a workspace folder (fast); only falls back to a search if that misses.
  */
 async function readMentionedFile(relPath: string): Promise<MentionedFileContent | undefined> {
-    for (const folder of vscode.workspace.workspaceFolders ?? []) {
+    const uri = resolveWorkspacePath(relPath);
+    if (uri) {
         try {
-            const text = await readFileText(vscode.Uri.joinPath(folder.uri, relPath));
-            return { text, searched: false };
+            return { text: await readFileText(uri), searched: false };
         } catch {
-            // Not under this folder; try the next one.
+            // Resolved by name but unreadable; fall through to a search.
         }
     }
 
-    const uris = await vscode.workspace.findFiles(relPath, undefined, 1);
+    const uris = await vscode.workspace.findFiles(toFolderRelative(relPath), undefined, 1);
     if (uris.length === 0) return undefined;
     return { text: await readFileText(uris[0]), searched: true };
+}
+
+/**
+ * Resolves a workspace-relative path (as produced by asRelativePath, which
+ * prepends the folder name in multi-root workspaces) to a concrete uri.
+ * Returns undefined when the path matches no workspace folder.
+ */
+export function resolveWorkspacePath(relPath: string): vscode.Uri | undefined {
+    const folders = vscode.workspace.workspaceFolders ?? [];
+    for (const folder of folders) {
+        if (relPath === folder.name) return folder.uri;
+        if (relPath.startsWith(folder.name + '/')) {
+            return vscode.Uri.joinPath(folder.uri, relPath.slice(folder.name.length + 1));
+        }
+    }
+    // Single-root paths carry no folder-name prefix.
+    if (folders.length === 1) return vscode.Uri.joinPath(folders[0].uri, relPath);
+    return undefined;
+}
+
+/**
+ * Strips the multi-root folder-name prefix from a path, yielding a
+ * folder-root-relative glob suitable for findFiles (which matches include
+ * patterns relative to each workspace folder).
+ */
+export function toFolderRelative(relPath: string): string {
+    for (const folder of vscode.workspace.workspaceFolders ?? []) {
+        if (relPath === folder.name) return '';
+        if (relPath.startsWith(folder.name + '/')) return relPath.slice(folder.name.length + 1);
+    }
+    return relPath;
 }
 
 export function fileBlock(relPath: string, content: string): string {

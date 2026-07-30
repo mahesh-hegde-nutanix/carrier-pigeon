@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { EditCall } from '../shared/toolParser';
+import { resolveWorkspacePath, toFolderRelative } from './context';
 
 // Diagnostics update asynchronously after an edit. We wait until they stay quiet
 // for QUIET_MS, capped at MAX_WAIT_MS. Both are heuristics.
@@ -60,16 +61,16 @@ export async function applyEdits(edits: EditCall[], sessionFiles: string[]): Pro
 }
 
 async function resolveFile(relPath: string): Promise<vscode.Uri | undefined> {
-    for (const folder of vscode.workspace.workspaceFolders ?? []) {
-        const uri = vscode.Uri.joinPath(folder.uri, relPath);
+    const uri = resolveWorkspacePath(relPath);
+    if (uri) {
         try {
             await vscode.workspace.fs.stat(uri);
             return uri;
         } catch {
-            // Not under this folder; try the next.
+            // Resolved by name but missing; fall through to a search.
         }
     }
-    const found = await vscode.workspace.findFiles(relPath, undefined, 1);
+    const found = await vscode.workspace.findFiles(toFolderRelative(relPath), undefined, 1);
     return found[0];
 }
 

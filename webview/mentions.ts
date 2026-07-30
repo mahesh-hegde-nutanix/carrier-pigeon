@@ -17,6 +17,8 @@ let selectedPopupIndex = -1;
 let mentionActive = false;
 // True while the host is building the context payload (potentially slow FS work).
 let copying = false;
+// A copy is queued, waiting on a fresh file list so pasted @mentions resolve.
+let pendingCopy = false;
 
 /** Attaches all input-area listeners. Call once on startup. */
 export function initMentions(): void {
@@ -64,24 +66,40 @@ export function autoResizeTextarea(): void {
 
 function performCopy(): void {
     const active = getActive();
-    if (!active) return;
+    if (!active || !els.chatInput.value.trim()) return;
+
+    // Refresh the file list before scanning so @mentions that were pasted
+    // (and thus never triggered a file fetch) are still resolved. The copy is
+    // completed in finishPendingCopy once the list arrives.
+    pendingCopy = true;
+    copying = true;
+    updateButtons();
+    post({ type: 'requestFiles' });
+}
+
+/** Completes a copy queued by performCopy, after the file list has refreshed. */
+export function finishPendingCopy(): void {
+    if (!pendingCopy) return;
+    pendingCopy = false;
+
+    const active = getActive();
     const text = els.chatInput.value.trim();
-    if (!text) return;
+    if (!active || !text) {
+        copying = false;
+        updateButtons();
+        return;
+    }
 
     const newMentioned = getMentionedFiles(text).filter(
         f => !active.mentionedFiles.includes(f)
     );
-
     post({
         type: 'requestContextCopy',
         text,
         files: newMentioned,
         isInitial: !active.initialContextCopied,
-        mode: active.mode || 'ask'
+        mode: active.mode || 'edit'
     });
-
-    copying = true;
-    updateButtons();
 }
 
 function performPaste(): void {

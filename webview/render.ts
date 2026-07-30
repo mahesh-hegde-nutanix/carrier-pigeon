@@ -9,6 +9,6 @@ export function renderAll(): void {
     renderTabs();
     renderMessages();
     const active = getActive();
-    if (active) els.modeSelect.value = active.mode || 'ask';
+    if (active) els.modeSelect.value = active.mode || 'edit';
     updateButtons();
 }

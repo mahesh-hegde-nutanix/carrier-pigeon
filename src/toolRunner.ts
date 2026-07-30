@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { EditCall, ReadFilesCall, ToolCall } from '../shared/toolParser';
-import { fileBlock, readFileText } from './context';
+import { fileBlock, readFileText, resolveWorkspacePath, toFolderRelative } from './context';
 import { readOutline } from './outline';
 import { runCommand } from './terminal';
 import { applyEdits } from './edits';
@@ -62,14 +62,14 @@ async function readFilesResult(call: ReadFilesCall): Promise<string> {
 }
 
 async function resolveReadFiles(pattern: string): Promise<vscode.Uri[]> {
-    for (const folder of vscode.workspace.workspaceFolders ?? []) {
-        const uri = vscode.Uri.joinPath(folder.uri, pattern);
+    const uri = resolveWorkspacePath(pattern);
+    if (uri) {
         try {
             await vscode.workspace.fs.stat(uri);
             return [uri];
         } catch {
-            // Not a direct file under this folder; fall through to glob search.
+            // Not a plain file (e.g. a glob pattern); fall through to search.
         }
     }
-    return vscode.workspace.findFiles(pattern, null);
+    return vscode.workspace.findFiles(toFolderRelative(pattern), undefined);
 }
