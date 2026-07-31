@@ -124,6 +124,7 @@ export interface ContextRequest {
     files: string[];
     isInitial: boolean;
     mode: ChatMode;
+    includeCallGraph?: boolean;
 }
 
 /** Caches the rule-files context per workspace, invalidating on file changes. */
@@ -344,6 +345,18 @@ export async function buildContextPayload(
         if (filesContext) buffer.push(`## Referenced Files\n${filesContext}\n`);
     } catch (filesErr) {
         console.error('[Webview] Error fetching mentioned files for context:', filesErr);
+    }
+
+    if (req.includeCallGraph) {
+        try {
+            const { generateCallGraphContext } = await import('./callGraph');
+            const callGraphContext = await timed('callGraph', () => generateCallGraphContext(req.text, req.files));
+            if (callGraphContext) {
+                buffer.push(`## Call Graph\n\`\`\`\n${callGraphContext}\n\`\`\`\n`);
+            }
+        } catch (cgErr) {
+            console.error('[Webview] Error generating call graph:', cgErr);
+        }
     }
 
     logTiming(`buildContextPayload (initial=${req.isInitial})`, start);

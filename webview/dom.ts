@@ -28,6 +28,7 @@ export const els = {
     pendingTools: byId<HTMLDivElement>('pending-tools'),
     mentionPopup: byId<HTMLDivElement>('mention-popup'),
     modeSelect: byId<HTMLSelectElement>('mode-select'),
+    callGraphCheck: byId<HTMLInputElement>('call-graph-check'),
     tabs: byId<HTMLDivElement>('tabs'),
     historyOverlay: byId<HTMLDivElement>('history-overlay'),
     historyList: byId<HTMLDivElement>('history-list'),

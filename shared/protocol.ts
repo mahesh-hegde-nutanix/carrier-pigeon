@@ -30,6 +30,7 @@ export interface RequestContextCopyMsg {
     files: string[];
     isInitial: boolean;
     mode: ChatMode;
+    includeCallGraph?: boolean;
 }
 
 export interface RequestPasteMsg {

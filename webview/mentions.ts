@@ -60,6 +60,11 @@ export function prefetchWorkspaceFiles(): void {
 export function updateButtons(): void {
     const active = getActive();
     els.actionButtons.innerHTML = '';
+
+    if (els.chatInput.value.trim().length === 0) {
+        els.callGraphCheck.checked = false;
+    }
+
     if (!active) return;
 
     if (copying) {
@@ -78,6 +83,7 @@ export function endCopying(sessionId: string): void {
     copying = false;
     copyingSessionId = null;
     setInputBlocked(false);
+    els.callGraphCheck.checked = false;
     updateButtons();
 }
 
@@ -133,7 +139,8 @@ export function finishPendingCopy(): void {
         text,
         files: mentionedFiles,
         isInitial: !active.initialContextCopied,
-        mode: active.mode || 'edit'
+        mode: active.mode || 'edit',
+        includeCallGraph: els.callGraphCheck.checked
     });
 }
 
