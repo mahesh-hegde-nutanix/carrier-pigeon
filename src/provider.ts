@@ -96,7 +96,7 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
                 break;
             }
             case 'requestContextCopy':
-                await this.copyContext(data.sessionId, data.text, data.files, data.isInitial, data.mode);
+                await this.copyContext(data.sessionId, data.text, data.files, data.isInitial, data.mode, data.includeCallGraph);
                 break;
             case 'requestPaste': {
                 const value = await vscode.env.clipboard.readText();
@@ -203,11 +203,12 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         text: string,
         files: string[],
         isInitial: boolean,
-        mode: ChatMode
+        mode: ChatMode,
+        includeCallGraph?: boolean
     ): Promise<void> {
         const start = Date.now();
         const payload = await buildContextPayload(
-            { text, files, isInitial, mode },
+            { text, files, isInitial, mode, includeCallGraph },
             { rules: this.rulesCache, files: this.filesCache, skills: await this.skills() }
         );
         await timed('clipboard.write', () => vscode.env.clipboard.writeText(payload));

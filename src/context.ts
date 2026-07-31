@@ -353,6 +353,8 @@ export async function buildContextPayload(
             const callGraphContext = await timed('callGraph', () => generateCallGraphContext(req.text, req.files));
             if (callGraphContext) {
                 buffer.push(`## Call Graph\n\`\`\`\n${callGraphContext}\n\`\`\`\n`);
+            } else {
+                console.log('[Context] Call graph was requested but returned empty or timed out.');
             }
         } catch (cgErr) {
             console.error('[Webview] Error generating call graph:', cgErr);

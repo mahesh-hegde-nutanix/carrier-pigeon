@@ -16,7 +16,7 @@ export async function generateCallGraphContext(text: string, files: string[], ma
         // Enforce 10-second timeout ceiling to ensure context compilation doesn't lock up
         return await Promise.race([
             buildGraph(text, files, maxDepth),
-            new Promise<string>((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000))
+            new Promise<string>((_, reject) => setTimeout(() => reject(new Error('timeout')), 120000))
         ]);
     } catch (e) {
         console.warn('[CallGraph] Failed or timed out:', e);
@@ -65,15 +65,17 @@ async function buildGraph(text: string, files: string[], maxDepth: number): Prom
                     targetSymbols.push(sym);
                 }
             }
-            // For explicit symbols we might need to dig into child scopes
-            if (explicitSymbols.size > 0 && sym.children) {
+            // We might need to dig into child scopes to find symbols
+            if (sym.children) {
                 queue.push(...sym.children);
             }
         }
 
         for (const sym of targetSymbols) {
             try {
-                const items = await vscode.commands.executeCommand<vscode.CallHierarchyItem[]>('vscode.prepareCallHierarchy', uri, sym.selectionRange.start);
+                const range = (sym as any).selectionRange || (sym as any).range || (sym as any).location?.range;
+                if (!range) continue;
+                const items = await vscode.commands.executeCommand<vscode.CallHierarchyItem[]>('vscode.prepareCallHierarchy', uri, range.start);
                 if (items && items.length > 0) {
                     seeds.push(...items);
                 }
@@ -83,7 +85,10 @@ async function buildGraph(text: string, files: string[], maxDepth: number): Prom
         }
     }
 
-    if (seeds.length === 0) return '';
+    if (seeds.length === 0) {
+        console.warn('[CallGraph] No supported symbols found to seed the call graph.');
+        return '';
+    }
 
     const visited = new Set<string>();
     const graph: GraphNode[] = [];
@@ -104,8 +109,11 @@ async function buildGraph(text: string, files: string[], maxDepth: number): Prom
         }
     };
     checkConnections(graph);
-    
-    if (!hasConnections) return '';
+
+    if (!hasConnections) {
+        console.log('[CallGraph] Graph generation yielded empty result (no incoming/outgoing calls).');
+        return '';
+    }
 
     let result = '';
     graph.forEach((node, idx) => {

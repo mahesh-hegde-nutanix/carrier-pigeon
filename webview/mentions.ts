@@ -270,13 +270,20 @@ export function showSymbolResults(requestId: number, symbols: WorkspaceSymbol[])
     ) {
         return;
     }
-    filteredItems = symbols.slice(0, MAX_MENTION_RESULTS).map(symbol => ({
-        value: symbol.name,
-        label: symbol.name,
-        detail: symbol.uri,
-        kind: 'symbol',
-        insertText: `@${symbol.path} (${symbol.name})`
-    }));
+    filteredItems = symbols.slice(0, MAX_MENTION_RESULTS).map(symbol => {
+        const unqualifiedName = symbol.name.split(/[\.:]+/).pop() || symbol.name;
+        let shortPath = symbol.path;
+        if (shortPath.length > 40) {
+            shortPath = '...' + shortPath.slice(-37);
+        }
+        return {
+            value: unqualifiedName,
+            label: unqualifiedName,
+            detail: shortPath,
+            kind: 'symbol',
+            insertText: `@${symbol.path} (${unqualifiedName})`
+        };
+    });
     if (filteredItems.length > 0) {
         showPopup();
     } else {

@@ -49,7 +49,7 @@ export function getHtmlForWebview(webview: vscode.Webview, extensionUri: vscode.
                 <option value="ask">&#128172; ASK MODE</option>
             </select>
             <label style="font-size: 0.8em; margin-left: 10px; margin-right: auto; cursor: pointer; display: flex; align-items: center; gap: 4px; color: var(--vscode-descriptionForeground);">
-                <input type="checkbox" id="call-graph-check" /> call graph
+                <input type="checkbox" id="call-graph-check" /> callgraph
             </label>
             <div class="action-buttons-container" id="action-buttons-container"></div>
         </div>
