@@ -10,22 +10,27 @@ const OPEN_TABS_STATE_KEY = 'carrierPigeon.openTabs';
 const SESSIONS_STATE_KEY = 'carrierPigeon.sessionSummaries';
 const SESSION_FILE_SUFFIX = '.json';
 
-/** Persists chat sessions as JSON files under the user's home directory. */
+/** Persists chat sessions as JSON files under the workspace storage directory. */
 export class SessionStore {
     private readonly storageDir: vscode.Uri;
 
     constructor(private readonly context: vscode.ExtensionContext) {
-        this.storageDir = vscode.Uri.file(
-            path.join(os.homedir(), STORAGE_DIR_NAME, SESSIONS_SUBDIR)
-        );
+        if (context.storageUri) {
+            this.storageDir = vscode.Uri.joinPath(context.storageUri, SESSIONS_SUBDIR);
+        } else {
+            // Fallback if no workspace is opened (e.g. ad-hoc single file view)
+            this.storageDir = vscode.Uri.file(
+                path.join(os.homedir(), STORAGE_DIR_NAME, SESSIONS_SUBDIR)
+            );
+        }
     }
 
     getTabState(): TabState | undefined {
-        return this.context.globalState.get<TabState>(OPEN_TABS_STATE_KEY);
+        return this.context.workspaceState.get<TabState>(OPEN_TABS_STATE_KEY);
     }
 
     async setTabState(state: TabState): Promise<void> {
-        await this.context.globalState.update(OPEN_TABS_STATE_KEY, state);
+        await this.context.workspaceState.update(OPEN_TABS_STATE_KEY, state);
     }
 
     async writeSession(session: Session): Promise<void> {
@@ -41,7 +46,7 @@ export class SessionStore {
             updatedAt: session.updatedAt,
             messageCount: (session.messages || []).length
         };
-        await this.context.globalState.update(SESSIONS_STATE_KEY, summaries);
+        await this.context.workspaceState.update(SESSIONS_STATE_KEY, summaries);
     }
 
     async readSession(id: string): Promise<Session> {
@@ -60,7 +65,7 @@ export class SessionStore {
             const summaries = await this.getSummaries();
             if (summaries[id]) {
                 delete summaries[id];
-                await this.context.globalState.update(SESSIONS_STATE_KEY, summaries);
+                await this.context.workspaceState.update(SESSIONS_STATE_KEY, summaries);
             }
         } catch (e) {
             console.error('[CarrierPigeon] Failed to update session summaries on delete:', id, e);
@@ -75,31 +80,24 @@ export class SessionStore {
         return sessions;
     }
 
-    private migrationPromise?: Promise<Record<string, SessionSummary>>;
-
     private async getSummaries(): Promise<Record<string, SessionSummary>> {
-        const summaries = this.context.globalState.get<Record<string, SessionSummary>>(SESSIONS_STATE_KEY);
+        const summaries = this.context.workspaceState.get<Record<string, SessionSummary>>(SESSIONS_STATE_KEY);
         if (summaries) return summaries;
 
-        if (!this.migrationPromise) {
-            this.migrationPromise = (async () => {
-                const migrated = await this.migrateAndListSessions();
-                await this.context.globalState.update(SESSIONS_STATE_KEY, migrated);
-                return migrated;
-            })();
-        }
-        return this.migrationPromise;
-    }
-
-    private async migrateAndListSessions(): Promise<Record<string, SessionSummary>> {
         await this.ensureStorageDir();
-        const entries = await vscode.workspace.fs.readDirectory(this.storageDir);
-        const summaries: Record<string, SessionSummary> = {};
+        let entries: [string, vscode.FileType][] = [];
+        try {
+            entries = await vscode.workspace.fs.readDirectory(this.storageDir);
+        } catch {
+            // Directory might not exist yet
+        }
+
+        const newSummaries: Record<string, SessionSummary> = {};
         for (const [name, type] of entries) {
             if (type !== vscode.FileType.File || !name.endsWith(SESSION_FILE_SUFFIX)) continue;
             try {
                 const s = await this.readSession(name.slice(0, -SESSION_FILE_SUFFIX.length));
-                summaries[s.id] = {
+                newSummaries[s.id] = {
                     id: s.id,
                     name: s.name,
                     createdAt: s.createdAt,
@@ -107,10 +105,11 @@ export class SessionStore {
                     messageCount: (s.messages || []).length
                 };
             } catch (e) {
-                console.error('[CarrierPigeon] Failed to read session file for migration:', name, e);
+                console.error('[CarrierPigeon] Failed to read session file for indexing:', name, e);
             }
         }
-        return summaries;
+        await this.context.workspaceState.update(SESSIONS_STATE_KEY, newSummaries);
+        return newSummaries;
     }
 
     async createSession(): Promise<Session> {
