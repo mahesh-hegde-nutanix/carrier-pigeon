@@ -7,6 +7,7 @@ import { Session, SessionSummary, TabState } from '../shared/session';
 const STORAGE_DIR_NAME = '.carrier-pigeon';
 const SESSIONS_SUBDIR = 'sessions';
 const OPEN_TABS_STATE_KEY = 'carrierPigeon.openTabs';
+const SESSIONS_STATE_KEY = 'carrierPigeon.sessionSummaries';
 const SESSION_FILE_SUFFIX = '.json';
 
 /** Persists chat sessions as JSON files under the user's home directory. */
@@ -31,6 +32,16 @@ export class SessionStore {
         await this.ensureStorageDir();
         const data = Buffer.from(JSON.stringify(session, null, 2), 'utf8');
         await vscode.workspace.fs.writeFile(this.sessionUri(session.id), data);
+
+        const summaries = await this.getSummaries();
+        summaries[session.id] = {
+            id: session.id,
+            name: session.name,
+            createdAt: session.createdAt,
+            updatedAt: session.updatedAt,
+            messageCount: (session.messages || []).length
+        };
+        await this.context.globalState.update(SESSIONS_STATE_KEY, summaries);
     }
 
     async readSession(id: string): Promise<Session> {
@@ -42,32 +53,64 @@ export class SessionStore {
         try {
             await vscode.workspace.fs.delete(this.sessionUri(id));
         } catch (e) {
-            console.error('[CarrierPigeon] Failed to delete session:', id, e);
+            console.error('[CarrierPigeon] Failed to delete session file:', id, e);
+        }
+
+        try {
+            const summaries = await this.getSummaries();
+            if (summaries[id]) {
+                delete summaries[id];
+                await this.context.globalState.update(SESSIONS_STATE_KEY, summaries);
+            }
+        } catch (e) {
+            console.error('[CarrierPigeon] Failed to update session summaries on delete:', id, e);
         }
     }
 
     /** Returns metadata for every stored session, most recently updated first. */
     async listSessions(): Promise<SessionSummary[]> {
+        const summaries = await this.getSummaries();
+        const sessions = Object.values(summaries);
+        sessions.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+        return sessions;
+    }
+
+    private migrationPromise?: Promise<Record<string, SessionSummary>>;
+
+    private async getSummaries(): Promise<Record<string, SessionSummary>> {
+        const summaries = this.context.globalState.get<Record<string, SessionSummary>>(SESSIONS_STATE_KEY);
+        if (summaries) return summaries;
+
+        if (!this.migrationPromise) {
+            this.migrationPromise = (async () => {
+                const migrated = await this.migrateAndListSessions();
+                await this.context.globalState.update(SESSIONS_STATE_KEY, migrated);
+                return migrated;
+            })();
+        }
+        return this.migrationPromise;
+    }
+
+    private async migrateAndListSessions(): Promise<Record<string, SessionSummary>> {
         await this.ensureStorageDir();
         const entries = await vscode.workspace.fs.readDirectory(this.storageDir);
-        const sessions: SessionSummary[] = [];
+        const summaries: Record<string, SessionSummary> = {};
         for (const [name, type] of entries) {
             if (type !== vscode.FileType.File || !name.endsWith(SESSION_FILE_SUFFIX)) continue;
             try {
                 const s = await this.readSession(name.slice(0, -SESSION_FILE_SUFFIX.length));
-                sessions.push({
+                summaries[s.id] = {
                     id: s.id,
                     name: s.name,
                     createdAt: s.createdAt,
                     updatedAt: s.updatedAt,
                     messageCount: (s.messages || []).length
-                });
+                };
             } catch (e) {
-                console.error('[CarrierPigeon] Failed to read session file:', name, e);
+                console.error('[CarrierPigeon] Failed to read session file for migration:', name, e);
             }
         }
-        sessions.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
-        return sessions;
+        return summaries;
     }
 
     async createSession(): Promise<Session> {
