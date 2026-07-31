@@ -3,6 +3,7 @@
 
 import { ChatMode, Session, SessionSummary } from './session';
 import { AppSettings } from './settings';
+import { SkillSummary } from './skills';
 import { ToolCall } from './toolParser';
 
 // ---- webview -> host --------------------------------------------------------
@@ -111,6 +112,7 @@ export interface InitStateMsg {
     type: 'initState';
     sessions: Session[];
     activeId: string | null;
+    skills: SkillSummary[];
 }
 
 export interface SessionCreatedMsg {

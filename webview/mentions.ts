@@ -1,20 +1,27 @@
 import { els, post } from './dom';
-import { getActive, getMentionedFiles, getWorkspaceFiles, saveActive } from './state';
+import { getActive, getMentionedFiles, getSkills, getWorkspaceFiles, saveActive } from './state';
 
 interface MentionState {
     start: number;
     end: number;
     query: string;
+    trigger: '@' | '/';
+}
+
+interface CompletionItem {
+    value: string;
+    label: string;
+    detail: string;
+    kind: 'file' | 'skill';
 }
 
 const MAX_TEXTAREA_HEIGHT = 120;
 const MAX_MENTION_RESULTS = 50;
 
-let filteredFiles: string[] = [];
+let filteredItems: CompletionItem[] = [];
 let currentMentionState: MentionState | null = null;
 let selectedPopupIndex = -1;
-// True while the cursor sits inside an @-mention token.
-let mentionActive = false;
+let activeTrigger: '@' | '/' | null = null;
 // True while the host is building the context payload (potentially slow FS work).
 let copying = false;
 let copyingSessionId: string | null = null;
@@ -152,45 +159,48 @@ function setInputBlocked(blocked: boolean): void {
 function checkMentionTrigger(): void {
     const val = els.chatInput.value;
     const cursorPos = els.chatInput.selectionStart;
-    const match = val.substring(0, cursorPos).match(/@([^\s]*)$/);
+    const match = val.substring(0, cursorPos).match(/(?:^|\s)([@/])([^\s]*)$/);
 
     if (!match) {
-        mentionActive = false;
+        activeTrigger = null;
         hidePopup();
         return;
     }
+    const trigger = match[1] as '@' | '/';
 
     // Re-fetch the file list once per mention token so files created since the
     // last mention (the host list is cached and invalidated on create/delete)
     // still appear.
-    if (!mentionActive) {
-        mentionActive = true;
+    if (trigger === '@' && activeTrigger !== '@') {
         post({ type: 'requestFiles', purpose: 'mention' });
     }
-    const query = match[1].toLowerCase();
+    activeTrigger = trigger;
+    const query = match[2].toLowerCase();
+    const tokenLength = match[1].length + match[2].length;
     currentMentionState = {
-        start: cursorPos - match[0].length,
+        start: cursorPos - tokenLength,
         end: cursorPos,
-        query
+        query,
+        trigger
     };
 
-    const allPaths = getWorkspacePaths();
+    const candidates = trigger === '@' ? fileCompletionItems() : skillCompletionItems();
 
     if (query) {
-        filteredFiles = allPaths
-            .map(f => {
-                const indices = fuzzyMatchIndices(query, f);
-                return { file: f, indices, score: computeFuzzyScore(indices, f) };
+        filteredItems = candidates
+            .map(item => {
+                const indices = fuzzyMatchIndices(query, item.value);
+                return { item, indices, score: computeFuzzyScore(indices, item.value) };
             })
             .filter(item => item.indices !== null)
             .sort((a, b) => b.score - a.score)
             .slice(0, MAX_MENTION_RESULTS)
-            .map(item => item.file);
+            .map(result => result.item);
     } else {
-        filteredFiles = allPaths.slice(0, MAX_MENTION_RESULTS);
+        filteredItems = candidates.slice(0, MAX_MENTION_RESULTS);
     }
 
-    if (filteredFiles.length > 0) {
+    if (filteredItems.length > 0) {
         showPopup();
     } else {
         hidePopup();
@@ -205,36 +215,28 @@ export function refreshMentionTrigger(): void {
 function showPopup(): void {
     els.mentionPopup.innerHTML = '';
     selectedPopupIndex = 0;
-    filteredFiles.forEach((file, index) => {
+    filteredItems.forEach((item, index) => {
         const div = document.createElement('div');
-        div.className = 'mention-item' + (index === 0 ? ' selected' : '');
-        
-        const lastSlash = file.lastIndexOf('/');
-        const base = lastSlash >= 0 ? file.substring(lastSlash + 1) : file;
-        const dir = lastSlash >= 0 ? file.substring(0, lastSlash + 1) : '';
+        div.className = `mention-item ${item.kind}` + (index === 0 ? ' selected' : '');
 
         if (currentMentionState && currentMentionState.query) {
-            const indices = fuzzyMatchIndices(currentMentionState.query, file);
+            const indices = fuzzyMatchIndices(currentMentionState.query, item.value);
             if (indices && indices.length > 0) {
-                const baseIndices = indices.filter(i => i > lastSlash).map(i => i - (lastSlash + 1));
-                const dirIndices = indices.filter(i => i <= lastSlash);
-                
-                const baseHtml = highlightFuzzyMatch(base, baseIndices);
-                const dirHtml = dir ? highlightFuzzyMatch(dir, dirIndices) : '';
-                
-                div.innerHTML = `<div class="mention-base">${baseHtml}</div>` +
-                                (dir ? `<div class="mention-dir">${dirHtml}</div>` : '');
+                const labelOffset = item.value.length - item.label.length;
+                const labelIndices = indices
+                    .filter(i => i >= labelOffset)
+                    .map(i => i - labelOffset);
+                div.innerHTML = `<div class="mention-base">${highlightFuzzyMatch(item.label, labelIndices)}</div>` +
+                    (item.detail ? `<div class="mention-dir">${escapeHtml(item.detail)}</div>` : '');
             } else {
-                div.innerHTML = `<div class="mention-base">${base}</div>` +
-                                (dir ? `<div class="mention-dir">${dir}</div>` : '');
+                div.innerHTML = completionHtml(item);
             }
         } else {
-            div.innerHTML = `<div class="mention-base">${base}</div>` +
-                            (dir ? `<div class="mention-dir">${dir}</div>` : '');
+            div.innerHTML = completionHtml(item);
         }
         div.onmousedown = (e) => {
             e.preventDefault();
-            insertMention(file);
+            insertMention(item.value);
         };
         els.mentionPopup.appendChild(div);
     });
@@ -247,13 +249,13 @@ function hidePopup(): void {
     selectedPopupIndex = -1;
 }
 
-function insertMention(filePath: string): void {
+function insertMention(value: string): void {
     if (!currentMentionState) return;
     const val = els.chatInput.value;
     const before = val.substring(0, currentMentionState.start);
     const after = val.substring(currentMentionState.end);
-    els.chatInput.value = before + '@' + filePath + ' ' + after;
-    const newCursorPos = currentMentionState.start + filePath.length + 2;
+    els.chatInput.value = before + currentMentionState.trigger + value + ' ' + after;
+    const newCursorPos = currentMentionState.start + value.length + 2;
     els.chatInput.setSelectionRange(newCursorPos, newCursorPos);
     hidePopup();
     autoResizeTextarea();
@@ -281,7 +283,7 @@ function onKeydown(e: KeyboardEvent): void {
         items[selectedPopupIndex].scrollIntoView({ block: 'nearest' });
     } else if (e.key === 'Enter' || e.key === 'Tab') {
         e.preventDefault();
-        if (filteredFiles[selectedPopupIndex]) insertMention(filteredFiles[selectedPopupIndex]);
+        if (filteredItems[selectedPopupIndex]) insertMention(filteredItems[selectedPopupIndex].value);
     } else if (e.key === 'Escape') {
         e.preventDefault();
         hidePopup();
@@ -292,6 +294,32 @@ const COPY_ICON =
     '<svg viewBox="0 0 16 16"><path d="M4 4l1-1h5.414L14 6.586V14l-1 1H5l-1-1V4zm9 3l-3-3H5v10h8V7z"/><path d="M3 1L2 2v10h1V2h6.414l-1-1H3z"/></svg>';
 const PASTE_ICON =
     '<svg viewBox="0 0 16 16"><path d="M11 2h-1.54C9.13 1 8.35 1 7.5 1c-.85 0-1.63 0-1.96 1H4L3 3v11l1 1h8l1-1V3l-1-1zM7.5 2c.28 0 .5.22.5.5s-.22.5-.5.5-.5-.22-.5-.5.22-.5.5-.5zM12 14H4V3h1v1h6V3h1v11z"/></svg>';
+
+function fileCompletionItems(): CompletionItem[] {
+    return getWorkspacePaths().map(value => {
+        const lastSlash = value.lastIndexOf('/');
+        return {
+            value,
+            label: lastSlash >= 0 ? value.substring(lastSlash + 1) : value,
+            detail: lastSlash >= 0 ? value.substring(0, lastSlash + 1) : '',
+            kind: 'file'
+        };
+    });
+}
+
+function skillCompletionItems(): CompletionItem[] {
+    return getSkills().map(skill => ({
+        value: skill.name,
+        label: skill.name,
+        detail: skill.description,
+        kind: 'skill'
+    }));
+}
+
+function completionHtml(item: CompletionItem): string {
+    return `<div class="mention-base">${escapeHtml(item.label)}</div>` +
+        (item.detail ? `<div class="mention-dir">${escapeHtml(item.detail)}</div>` : '');
+}
 
 function getWorkspacePaths(): string[] {
     const files = getWorkspaceFiles();
@@ -344,10 +372,19 @@ function highlightFuzzyMatch(text: string, indices: number[]): string {
     let result = '';
     let lastIdx = 0;
     for (const idx of indices) {
-        result += text.substring(lastIdx, idx);
-        result += '<strong>' + text[idx] + '</strong>';
+        result += escapeHtml(text.substring(lastIdx, idx));
+        result += '<strong>' + escapeHtml(text[idx]) + '</strong>';
         lastIdx = idx + 1;
     }
-    result += text.substring(lastIdx);
+    result += escapeHtml(text.substring(lastIdx));
     return result;
+}
+
+function escapeHtml(text: string): string {
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }

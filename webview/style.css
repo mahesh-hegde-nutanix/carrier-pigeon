@@ -210,6 +210,11 @@ body, html {
     text-overflow: ellipsis;
 }
 
+.mention-item.skill .mention-dir {
+    font-family: var(--vscode-font-family);
+    white-space: normal;
+}
+
 .mention-item:hover, .mention-item.selected {
     background-color: var(--popup-hover);
 }

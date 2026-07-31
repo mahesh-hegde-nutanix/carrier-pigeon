@@ -8,6 +8,7 @@ import {
     persistOpenTabs,
     saveActive,
     setActiveId,
+    setSkills,
     setSessions,
     setWorkspaceFiles
 } from './state';
@@ -26,6 +27,7 @@ window.addEventListener('message', (event: MessageEvent<HostToWebview>) => {
         case 'initState':
             setSessions(message.sessions);
             setActiveId(message.activeId);
+            setSkills(message.skills);
             renderAll();
             revealBooted();
             prefetchWorkspaceFiles();

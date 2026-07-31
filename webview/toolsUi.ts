@@ -95,6 +95,10 @@ function describe(call: ToolCall): string {
             return `read_files: ${call.files.join(', ')}`;
         case 'read_outline':
             return `read_outline: ${call.paths.join(', ')}`;
+        case 'read_skill':
+            return call.references.length > 0
+                ? `read_skill: ${call.skill} (${call.references.join(', ')})`
+                : `read_skill: ${call.skill}`;
         case 'run_cmd':
             return call.repo ? `[${call.repo}] ${call.command}` : call.command;
         case 'edit':

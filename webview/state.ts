@@ -1,4 +1,5 @@
 import { Session } from '../shared/session';
+import { SkillSummary } from '../shared/skills';
 import { post } from './dom';
 
 // Full session objects backing the open tabs.
@@ -7,6 +8,7 @@ let activeId: string | null = null;
 
 // All workspace file paths, lazily fetched for @-mentions.
 let workspaceFiles: string[] = [];
+let skills: SkillSummary[] = [];
 
 export function getSessions(): Session[] {
     return openSessions;
@@ -34,6 +36,14 @@ export function getWorkspaceFiles(): string[] {
 
 export function setWorkspaceFiles(files: string[]): void {
     workspaceFiles = files;
+}
+
+export function getSkills(): SkillSummary[] {
+    return skills;
+}
+
+export function setSkills(value: SkillSummary[]): void {
+    skills = value;
 }
 
 export function persistOpenTabs(): void {

@@ -8,6 +8,7 @@ import { logTiming, timed } from './timing';
 import { runTools } from './toolRunner';
 import { ToolCall } from '../shared/toolParser';
 import { getSettings, loadSettings, saveSettings } from './settings';
+import { SkillRegistry } from './skills';
 
 export const CHAT_VIEW_ID = 'carrierPigeon.chatView';
 
@@ -17,6 +18,7 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
     private readonly store: SessionStore;
     private readonly rulesCache: RuleFilesCache;
     private readonly filesCache: WorkspaceFilesCache;
+    private skillsPromise?: Promise<SkillRegistry>;
 
     constructor(private readonly context: vscode.ExtensionContext) {
         this.store = new SessionStore(context);
@@ -54,6 +56,7 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         switch (data.type) {
             case 'ready':
                 await loadSettings();
+                await this.skills();
                 await this.sendInitState();
                 break;
             case 'requestFiles': {
@@ -121,7 +124,7 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     private async executeTools(calls: ToolCall[], sessionFiles: string[]): Promise<void> {
-        const result = await runTools(calls, sessionFiles, (chunk) => {
+        const result = await runTools(calls, sessionFiles, await this.skills(), (chunk) => {
             this.post({ type: 'toolOutputChunk', chunk });
         });
         let copied = false;
@@ -148,7 +151,7 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         const start = Date.now();
         const payload = await buildContextPayload(
             { text, files, isInitial, mode },
-            { rules: this.rulesCache, files: this.filesCache }
+            { rules: this.rulesCache, files: this.filesCache, skills: await this.skills() }
         );
         await timed('clipboard.write', () => vscode.env.clipboard.writeText(payload));
         vscode.window.setStatusBarMessage(
@@ -187,6 +190,16 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
             activeId = openSessions[0].id;
         }
 
-        this.post({ type: 'initState', sessions: openSessions, activeId });
+        this.post({
+            type: 'initState',
+            sessions: openSessions,
+            activeId,
+            skills: (await this.skills()).summaries()
+        });
+    }
+
+    private skills(): Promise<SkillRegistry> {
+        this.skillsPromise ??= SkillRegistry.load();
+        return this.skillsPromise;
     }
 }

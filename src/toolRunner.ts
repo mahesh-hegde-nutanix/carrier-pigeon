@@ -4,6 +4,7 @@ import { fileBlock, readFileText, resolveRepoUri, resolveWorkspacePath, toFolder
 import { readOutline } from './outline';
 import { runCommand } from './terminal';
 import { applyEdits } from './edits';
+import { SkillRegistry } from './skills';
 
 export interface ToolRunResult {
     // Combined output of read/outline/run tools, destined for the clipboard.
@@ -16,6 +17,7 @@ export interface ToolRunResult {
 export async function runTools(
     calls: ToolCall[],
     sessionFiles: string[],
+    skills: SkillRegistry,
     onChunk?: (chunk: string) => void
 ): Promise<ToolRunResult> {
     const results: string[] = [];
@@ -32,6 +34,12 @@ export async function runTools(
             case 'read_outline': {
                 const res = `**Outline**\n${await readOutline(call.paths)}`;
                 if (onChunk) onChunk(`${res}\n\n`);
+                results.push(res);
+                break;
+            }
+            case 'read_skill': {
+                const res = await skills.read(call.skill, call.references);
+                if (onChunk) onChunk(`**Read Skill: ${call.skill}**\n\`\`\`\n${res}\n\`\`\`\n\n`);
                 results.push(res);
                 break;
             }

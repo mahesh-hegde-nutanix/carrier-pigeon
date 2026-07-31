@@ -22,6 +22,12 @@ export interface RunCmdCall {
     repo?: string;
 }
 
+export interface ReadSkillCall {
+    tool: 'read_skill';
+    skill: string;
+    references: string[];
+}
+
 export interface EditCall {
     tool: 'edit';
     path: string;
@@ -29,7 +35,7 @@ export interface EditCall {
     replace: string;
 }
 
-export type ToolCall = ReadFilesCall | ReadOutlineCall | RunCmdCall | EditCall;
+export type ToolCall = ReadFilesCall | ReadOutlineCall | ReadSkillCall | RunCmdCall | EditCall;
 
 const SEARCH_PREFIX = '>>> SEARCH ';
 const REPLACE_PREFIX = '<<< REPLACE';
@@ -119,6 +125,15 @@ function parseJsonCall(line: string): ToolCall | undefined {
             return isStringArray(record.files) ? { tool: 'read_files', files: record.files } : undefined;
         case 'read_outline':
             return isStringArray(record.paths) ? { tool: 'read_outline', paths: record.paths } : undefined;
+        case 'read_skill':
+            return typeof record.skill === 'string' &&
+                (record.references === undefined || isStringArray(record.references))
+                ? {
+                    tool: 'read_skill',
+                    skill: record.skill,
+                    references: record.references ?? []
+                }
+                : undefined;
         case 'run_cmd':
             return typeof record.command === 'string'
                 ? {

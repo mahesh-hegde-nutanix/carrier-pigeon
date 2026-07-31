@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { ChatMode } from '../shared/session';
 import { filterIgnored, getSettings } from './settings';
 import { logTiming, timed } from './timing';
+import { SkillRegistry } from './skills';
 import * as cp from 'child_process';
 import * as util from 'util';
 
@@ -81,6 +82,18 @@ Example:
 
 ` + "```" + `
 {"tool": "read_outline", "paths": ["my/repo/package"]}
+` + "```" + `
+
+---
+
+* read_skill
+Reads a skill's main page and its references tree. Pass a non-empty "references" array to read those specific reference files instead of the tree.
+Use the skill and reference names exactly as listed; skill storage paths are not exposed.
+Example:
+
+` + "```" + `
+{"tool": "read_skill", "skill": "skill-name"}
+{"tool": "read_skill", "skill": "skill-name", "references": ["topic.md"]}
 ` + "```" + `
 
 ---
@@ -219,6 +232,7 @@ async function scanWorkspaceFiles(): Promise<vscode.Uri[]> {
 export interface ContextCaches {
     rules: RuleFilesCache;
     files: WorkspaceFilesCache;
+    skills: SkillRegistry;
 }
 
 interface GitRepository {
@@ -296,7 +310,7 @@ export async function buildContextPayload(
     const buffer: string[] = [];
 
     if (req.isInitial) {
-        buffer.push(`## Instructions\n${systemPrompt(req.mode)}\n`);
+        buffer.push(`## Instructions\n${systemPrompt(req.mode, caches.skills)}\n`);
         buffer.push(`## Task\n${req.text}\n`);
 
         try {
@@ -320,6 +334,13 @@ export async function buildContextPayload(
     }
 
     try {
+        const skillsContext = await caches.skills.contextForInvocations(req.text);
+        if (skillsContext) buffer.push(`## Skills Files\n${skillsContext}\n`);
+    } catch (skillsErr) {
+        console.error('[Webview] Error fetching skill files for context:', skillsErr);
+    }
+
+    try {
         const filesContext = await getFilesContext(req.files);
         if (filesContext) buffer.push(`## Referenced Files\n${filesContext}\n`);
     } catch (filesErr) {
@@ -330,11 +351,22 @@ export async function buildContextPayload(
     return buffer.join('\n');
 }
 
-function systemPrompt(mode: ChatMode): string {
+function systemPrompt(mode: ChatMode, skills: SkillRegistry): string {
     const modeSpecific = mode === 'edit' ? EDIT_MODE_PROMPT : ASK_MODE_PROMPT;
     const custom = getSettings().customInstructions.trim();
     const customBlock = custom ? `${custom}\n\n` : '';
-    return `${SYSTEM_PROMPT_BEGIN}\n\n${modeSpecific}\n\n${SYSTEM_PROMPT_END}\n\n${customBlock}${TOOL_DESCRIPTIONS}`;
+    return `${SYSTEM_PROMPT_BEGIN}\n\n${modeSpecific}\n\n${SYSTEM_PROMPT_END}\n\n${customBlock}${TOOL_DESCRIPTIONS}${skillsPrompt(skills)}`;
+}
+
+function skillsPrompt(skills: SkillRegistry): string {
+    const available = skills.implicitSummaries();
+    if (available.length === 0) return '';
+    const entries = available.map(skill => `- ${skill.name} (${skill.description})`).join('\n');
+    return `
+Skills contain proprietary knowledge bases and workflows. Use the read_skill tool to read a skill's main page. Utilize read_skill with a list of references to drill down into more specific references. Following skills are available.
+
+${entries}
+`;
 }
 
 interface FileTree {
