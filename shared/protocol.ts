@@ -37,6 +37,11 @@ export interface RequestPasteMsg {
     type: 'requestPaste';
 }
 
+export interface RequestCheckSelectionMatchMsg {
+    type: 'requestCheckSelectionMatch';
+    text: string;
+}
+
 export interface CreateSessionMsg {
     type: 'createSession';
 }
@@ -110,7 +115,8 @@ export type WebviewToHost =
     | ExecuteToolsMsg
     | CopyTextMsg
     | RequestSettingsMsg
-    | UpdateSettingsMsg;
+    | UpdateSettingsMsg
+    | RequestCheckSelectionMatchMsg;
 
 // ---- host -> webview --------------------------------------------------------
 
@@ -173,6 +179,14 @@ export interface PastedMessageMsg {
     value: string;
 }
 
+export interface SelectionMatchResultMsg {
+    type: 'selectionMatchResult';
+    text: string;
+    filePath?: string;
+    startLine?: number;
+    endLine?: number;
+}
+
 export interface ToolResultsMsg {
     type: 'toolResults';
     // Combined output of read/outline/run tools, already copied to clipboard.
@@ -204,4 +218,5 @@ export type HostToWebview =
     | PastedMessageMsg
     | ToolResultsMsg
     | SettingsLoadedMsg
-    | ToolOutputChunkMsg;
+    | ToolOutputChunkMsg
+    | SelectionMatchResultMsg;

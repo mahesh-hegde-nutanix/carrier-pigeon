@@ -103,6 +103,34 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
                 this.post({ type: 'pastedMessage', value });
                 break;
             }
+            case 'requestCheckSelectionMatch': {
+                const editor = vscode.window.activeTextEditor;
+                let filePath: string | undefined;
+                let startLine: number | undefined;
+                let endLine: number | undefined;
+
+                if (editor) {
+                    const selection = editor.selection;
+                    const selectedText = editor.document.getText(selection);
+                    // Normalize line endings to safely match clipboard contents across OSes
+                    const normalizedSelected = selectedText.replace(/\r\n/g, '\n');
+                    const normalizedPasted = data.text.replace(/\r\n/g, '\n');
+                    
+                    if (normalizedSelected === normalizedPasted) {
+                        filePath = vscode.workspace.asRelativePath(editor.document.uri);
+                        startLine = selection.start.line + 1;
+                        endLine = selection.end.line + 1;
+                    }
+                }
+                this.post({
+                    type: 'selectionMatchResult',
+                    text: data.text,
+                    filePath,
+                    startLine,
+                    endLine
+                });
+                break;
+            }
             case 'createSession': {
                 const session = await this.store.createSession();
                 this.post({ type: 'sessionCreated', session });

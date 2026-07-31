@@ -1,5 +1,5 @@
 import { els, post } from './dom';
-import { WorkspaceSymbol } from '../shared/protocol';
+import { WorkspaceSymbol, SelectionMatchResultMsg } from '../shared/protocol';
 import { getActive, getMentionedFiles, getSkills, getWorkspaceFiles, saveActive } from './state';
 
 interface MentionState {
@@ -32,6 +32,7 @@ let copying = false;
 let copyingSessionId: string | null = null;
 // A copy is queued, waiting on a fresh file list so pasted @mentions resolve.
 let pendingCopy = false;
+let pendingPaste: { text: string, start: number, end: number } | null = null;
 
 /** Attaches all input-area listeners. Call once on startup. */
 export function initMentions(): void {
@@ -50,6 +51,37 @@ export function initMentions(): void {
     });
 
     els.chatInput.addEventListener('keydown', onKeydown);
+    els.chatInput.addEventListener('paste', onPaste);
+}
+
+function onPaste(e: ClipboardEvent): void {
+    const text = e.clipboardData?.getData('text/plain');
+    if (!text) return;
+
+    e.preventDefault();
+    pendingPaste = {
+        text,
+        start: els.chatInput.selectionStart,
+        end: els.chatInput.selectionEnd
+    };
+
+    post({ type: 'requestCheckSelectionMatch', text });
+}
+
+export function handleSelectionMatchResult(msg: SelectionMatchResultMsg): void {
+    if (!pendingPaste || pendingPaste.text !== msg.text) return;
+
+    let inserted = msg.text;
+    if (msg.filePath && msg.startLine !== undefined && msg.endLine !== undefined) {
+        inserted = `@${msg.filePath}:${msg.startLine}-${msg.endLine}\n\`\`\`\n${msg.text}\n\`\`\``;
+    }
+
+    els.chatInput.focus();
+    els.chatInput.setRangeText(inserted, pendingPaste.start, pendingPaste.end, 'end');
+    pendingPaste = null;
+    
+    // Trigger input event to re-calculate mentions, sizing and button state
+    els.chatInput.dispatchEvent(new Event('input'));
 }
 
 /** Starts a background workspace file load so @mentions are ready on first use. */

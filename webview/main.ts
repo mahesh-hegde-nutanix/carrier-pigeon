@@ -17,7 +17,7 @@ import { appendMessage, updateMessageDom } from './messagesUi';
 import { handlePaste, handleToolResults } from './toolsUi';
 import { showHistory, openLoadedSession, handleSessionDeleted } from './history';
 import { initSettings, showSettings } from './settings';
-import { autoResizeTextarea, endCopying, finishPendingCopy, initMentions, prefetchWorkspaceFiles, refreshMentionTrigger, showSymbolResults, updateButtons } from './mentions';
+import { autoResizeTextarea, endCopying, finishPendingCopy, handleSelectionMatchResult, initMentions, prefetchWorkspaceFiles, refreshMentionTrigger, showSymbolResults, updateButtons } from './mentions';
 
 let currentStreamMessage: { text: string, dom: HTMLElement } | null = null;
 
@@ -63,6 +63,9 @@ window.addEventListener('message', (event: MessageEvent<HostToWebview>) => {
             break;
         case 'pastedMessage':
             if (message.value) handlePaste(message.value);
+            break;
+        case 'selectionMatchResult':
+            handleSelectionMatchResult(message);
             break;
         case 'toolOutputChunk':
             if (!currentStreamMessage) {
