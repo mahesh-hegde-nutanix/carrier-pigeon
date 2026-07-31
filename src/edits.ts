@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { EditCall } from '../shared/toolParser';
-import { resolveWorkspacePath, toFolderRelative } from './context';
+import { resolveWorkspacePath, toFolderRelative, fileBlock } from './context';
 
 // Diagnostics update asynchronously after an edit. We wait until they stay quiet
 // for QUIET_MS, capped at MAX_WAIT_MS. Both are heuristics.
@@ -11,6 +11,7 @@ const MAX_ADDED_INDENT_LEVELS = 3;
 interface EditFailure {
     path: string;
     reason: string;
+    uri?: vscode.Uri;
 }
 
 interface MatchResult {
@@ -28,7 +29,8 @@ export async function applyEdits(edits: EditCall[], sessionFiles: string[]): Pro
     const failures: EditFailure[] = [];
     const editedUris: vscode.Uri[] = [];
 
-    for (const edit of edits) {
+    for (let i = 0; i < edits.length; i++) {
+        const edit = edits[i];
         const uri = await resolveFile(edit.path);
         if (!uri) {
             failures.push({ path: edit.path, reason: 'file not found' });
@@ -37,7 +39,7 @@ export async function applyEdits(edits: EditCall[], sessionFiles: string[]): Pro
         const doc = await vscode.workspace.openTextDocument(uri);
         const match = findMatch(doc, edit.search, edit.replace);
         if (!match) {
-            failures.push({ path: edit.path, reason: `search block not found: ${firstLine(edit.search)}` });
+            failures.push({ path: edit.path, reason: `search block (${i + 1}) not found which starts with: ${firstLine(edit.search)}`, uri });
             continue;
         }
         workspaceEdit.replace(uri, match.range, match.replacement);
@@ -57,7 +59,7 @@ export async function applyEdits(edits: EditCall[], sessionFiles: string[]): Pro
     await waitForDiagnostics();
     const newErrors = diffErrors(before, snapshotErrors(monitored));
 
-    return buildReport(failures, newErrors);
+    return await buildReport(failures, newErrors);
 }
 
 async function resolveFile(relPath: string): Promise<vscode.Uri | undefined> {
@@ -224,7 +226,7 @@ function waitForDiagnostics(): Promise<void> {
     });
 }
 
-function buildReport(failures: EditFailure[], newErrors: NewError[]): string | undefined {
+async function buildReport(failures: EditFailure[], newErrors: NewError[]): Promise<string | undefined> {
     if (failures.length === 0 && newErrors.length === 0) return undefined;
     const parts: string[] = [];
     if (failures.length > 0) {
@@ -237,5 +239,25 @@ function buildReport(failures: EditFailure[], newErrors: NewError[]): string | u
             parts.push(`- ${vscode.workspace.asRelativePath(e.uri)}:${e.line}: ${e.message}`);
         }
     }
+
+    const missingFiles = new Set<vscode.Uri>();
+    for (const f of failures) {
+        if (f.uri && f.reason.includes('search block')) {
+            missingFiles.add(f.uri);
+        }
+    }
+
+    if (missingFiles.size > 0) {
+        parts.push('\nAttaching current contents of files with failed edits:');
+        for (const uri of missingFiles) {
+            try {
+                const doc = await vscode.workspace.openTextDocument(uri);
+                parts.push(fileBlock(vscode.workspace.asRelativePath(uri), doc.getText()));
+            } catch (e) {
+                console.error('Failed to read document for report', e);
+            }
+        }
+    }
+
     return parts.join('\n');
 }
