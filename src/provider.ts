@@ -30,6 +30,7 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
 
     resolveWebviewView(webviewView: vscode.WebviewView): void {
         this.view = webviewView;
+        this.skillsPromise = undefined; // Refresh skills cache for the new view
 
         webviewView.webview.options = {
             enableScripts: true,

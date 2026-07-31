@@ -309,9 +309,10 @@ export async function buildContextPayload(
     const start = Date.now();
     const buffer: string[] = [];
 
+    buffer.push(`${req.text}\n`);
+
     if (req.isInitial) {
         buffer.push(`## Instructions\n${systemPrompt(req.mode, caches.skills)}\n`);
-        buffer.push(`## Task\n${req.text}\n`);
 
         try {
             const uris = await timed('files.scan', () => caches.files.get());
@@ -329,13 +330,11 @@ export async function buildContextPayload(
         } catch (rulesErr) {
             console.error('[Webview] Error fetching rule files for context:', rulesErr);
         }
-    } else {
-        buffer.push(`## Task\n${req.text}\n`);
     }
 
     try {
         const skillsContext = await caches.skills.contextForInvocations(req.text);
-        if (skillsContext) buffer.push(`## Skills Files\n${skillsContext}\n`);
+        if (skillsContext) buffer.push(`## Skill Rules\n${skillsContext}\n`);
     } catch (skillsErr) {
         console.error('[Webview] Error fetching skill files for context:', skillsErr);
     }
