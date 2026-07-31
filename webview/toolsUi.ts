@@ -115,4 +115,6 @@ function addCopyErrorsButton(messageEl: HTMLElement, report: string): void {
     btn.textContent = 'COPY ERRORS';
     btn.onclick = () => post({ type: 'copyText', text: report });
     messageEl.appendChild(btn);
+    messageEl.classList.add('has-error');
+    btn.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }

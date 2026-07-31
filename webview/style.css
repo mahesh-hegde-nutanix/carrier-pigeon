@@ -154,6 +154,11 @@ body, html {
     border-radius: 0;
 }
 
+.message.has-error {
+    border: 1px solid var(--vscode-errorForeground);
+    background-color: var(--vscode-inputValidation-errorBackground, rgba(255, 0, 0, 0.1));
+}
+
 .input-area {
     padding: 10px;
     border-top: 1px solid var(--border-color);
@@ -595,7 +600,24 @@ textarea:focus {
 }
 
 .copy-errors-btn {
+    display: none;
+    width: 100%;
+    box-sizing: border-box;
     margin-top: 8px;
+    padding: 8px;
+    font-size: 0.9em;
     color: var(--vscode-errorForeground);
-    border-color: var(--vscode-errorForeground);
+    border: 1px solid var(--vscode-errorForeground);
+    border-radius: 4px;
+    text-align: center;
+    cursor: pointer;
+}
+
+.message:hover .copy-errors-btn {
+    display: block;
+}
+
+.copy-errors-btn:hover {
+    background: var(--vscode-errorForeground);
+    color: var(--vscode-editor-background);
 }
