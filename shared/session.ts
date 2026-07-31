@@ -1,6 +1,6 @@
 // Types shared between the extension host and the webview.
 
-export type ChatSender = 'user' | 'ai';
+export type ChatSender = 'user' | 'ai' | 'tool';
 
 export type ChatMode = 'ask' | 'edit';
 

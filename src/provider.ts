@@ -121,7 +121,9 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     private async executeTools(calls: ToolCall[], sessionFiles: string[]): Promise<void> {
-        const result = await runTools(calls, sessionFiles);
+        const result = await runTools(calls, sessionFiles, (chunk) => {
+            this.post({ type: 'toolOutputChunk', chunk });
+        });
         let copied = false;
         if (result.resultsText) {
             await vscode.env.clipboard.writeText(result.resultsText);

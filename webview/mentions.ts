@@ -114,14 +114,12 @@ export function finishPendingCopy(): void {
         return;
     }
 
-    const newMentioned = getMentionedFiles(text).filter(
-        f => !active.mentionedFiles.includes(f)
-    );
+    const mentionedFiles = getMentionedFiles(text);
     post({
         type: 'requestContextCopy',
         sessionId: active.id,
         text,
-        files: newMentioned,
+        files: mentionedFiles,
         isInitial: !active.initialContextCopied,
         mode: active.mode || 'edit'
     });
@@ -175,9 +173,23 @@ function checkMentionTrigger(): void {
         end: cursorPos,
         query
     };
-    filteredFiles = getWorkspaceFiles()
-        .filter(f => f.toLowerCase().includes(query))
-        .slice(0, MAX_MENTION_RESULTS);
+
+    const allPaths = getWorkspacePaths();
+
+    if (query) {
+        filteredFiles = allPaths
+            .map(f => {
+                const indices = fuzzyMatchIndices(query, f);
+                return { file: f, indices, score: computeFuzzyScore(indices, f) };
+            })
+            .filter(item => item.indices !== null)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, MAX_MENTION_RESULTS)
+            .map(item => item.file);
+    } else {
+        filteredFiles = allPaths.slice(0, MAX_MENTION_RESULTS);
+    }
+
     if (filteredFiles.length > 0) {
         showPopup();
     } else {
@@ -196,11 +208,29 @@ function showPopup(): void {
     filteredFiles.forEach((file, index) => {
         const div = document.createElement('div');
         div.className = 'mention-item' + (index === 0 ? ' selected' : '');
-        div.textContent = file;
+        
+        const lastSlash = file.lastIndexOf('/');
+        const base = lastSlash >= 0 ? file.substring(lastSlash + 1) : file;
+        const dir = lastSlash >= 0 ? file.substring(0, lastSlash + 1) : '';
+
         if (currentMentionState && currentMentionState.query) {
-            const escaped = currentMentionState.query.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-            const regex = new RegExp('(' + escaped + ')', 'gi');
-            div.innerHTML = file.replace(regex, '<strong>$1</strong>');
+            const indices = fuzzyMatchIndices(currentMentionState.query, file);
+            if (indices && indices.length > 0) {
+                const baseIndices = indices.filter(i => i > lastSlash).map(i => i - (lastSlash + 1));
+                const dirIndices = indices.filter(i => i <= lastSlash);
+                
+                const baseHtml = highlightFuzzyMatch(base, baseIndices);
+                const dirHtml = dir ? highlightFuzzyMatch(dir, dirIndices) : '';
+                
+                div.innerHTML = `<div class="mention-base">${baseHtml}</div>` +
+                                (dir ? `<div class="mention-dir">${dirHtml}</div>` : '');
+            } else {
+                div.innerHTML = `<div class="mention-base">${base}</div>` +
+                                (dir ? `<div class="mention-dir">${dir}</div>` : '');
+            }
+        } else {
+            div.innerHTML = `<div class="mention-base">${base}</div>` +
+                            (dir ? `<div class="mention-dir">${dir}</div>` : '');
         }
         div.onmousedown = (e) => {
             e.preventDefault();
@@ -262,3 +292,62 @@ const COPY_ICON =
     '<svg viewBox="0 0 16 16"><path d="M4 4l1-1h5.414L14 6.586V14l-1 1H5l-1-1V4zm9 3l-3-3H5v10h8V7z"/><path d="M3 1L2 2v10h1V2h6.414l-1-1H3z"/></svg>';
 const PASTE_ICON =
     '<svg viewBox="0 0 16 16"><path d="M11 2h-1.54C9.13 1 8.35 1 7.5 1c-.85 0-1.63 0-1.96 1H4L3 3v11l1 1h8l1-1V3l-1-1zM7.5 2c.28 0 .5.22.5.5s-.22.5-.5.5-.5-.22-.5-.5.22-.5.5-.5zM12 14H4V3h1v1h6V3h1v11z"/></svg>';
+
+function getWorkspacePaths(): string[] {
+    const files = getWorkspaceFiles();
+    const paths = new Set<string>();
+    files.forEach(f => {
+        paths.add(f);
+        let lastSlash = f.lastIndexOf('/');
+        while (lastSlash > 0) {
+            paths.add(f.substring(0, lastSlash) + '/');
+            lastSlash = f.lastIndexOf('/', lastSlash - 1);
+        }
+    });
+    return Array.from(paths);
+}
+
+function computeFuzzyScore(indices: number[] | null, text: string): number {
+    if (!indices || indices.length === 0) return 0;
+    let score = 0;
+    let streak = 0;
+    for (let i = 1; i < indices.length; i++) {
+        if (indices[i] === indices[i - 1] + 1) {
+            streak++;
+            score += streak * 10;
+        } else {
+            streak = 0;
+        }
+    }
+    // Prefer shorter strings, and matches closer to the start
+    score -= text.length * 0.1;
+    score -= indices[0] * 0.1;
+    return score;
+}
+
+function fuzzyMatchIndices(query: string, text: string): number[] | null {
+    if (!query) return [];
+    let qIdx = 0;
+    const matchIndices: number[] = [];
+    const lowerText = text.toLowerCase();
+    for (let i = 0; i < lowerText.length; i++) {
+        if (lowerText[i] === query[qIdx]) {
+            matchIndices.push(i);
+            qIdx++;
+            if (qIdx === query.length) return matchIndices;
+        }
+    }
+    return null;
+}
+
+function highlightFuzzyMatch(text: string, indices: number[]): string {
+    let result = '';
+    let lastIdx = 0;
+    for (const idx of indices) {
+        result += text.substring(lastIdx, idx);
+        result += '<strong>' + text[idx] + '</strong>';
+        lastIdx = idx + 1;
+    }
+    result += text.substring(lastIdx);
+    return result;
+}

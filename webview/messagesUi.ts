@@ -20,9 +20,9 @@ export function renderMessages(): void {
     active.messages.forEach(m => renderMessageDom(m.text, m.sender));
 }
 
-export function appendMessage(text: string, sender: ChatSender): HTMLElement {
+export function appendMessage(text: string, sender: ChatSender, skipSave = false): HTMLElement {
     const active = getActive();
-    if (active) {
+    if (active && !skipSave) {
         active.messages.push({ sender, text });
         saveActive();
     }
@@ -33,14 +33,25 @@ export function appendMessage(text: string, sender: ChatSender): HTMLElement {
     return renderMessageDom(text, sender);
 }
 
+export function updateMessageDom(msgDiv: HTMLElement, text: string, sender: ChatSender): void {
+    const contentDiv = msgDiv.querySelector('.message-content') as HTMLElement;
+    if (!contentDiv) return;
+    if (sender === 'ai' || sender === 'tool') {
+        contentDiv.innerHTML = DOMPurify.sanitize(marked.parse(text, { async: false }));
+    } else {
+        contentDiv.textContent = text;
+    }
+    els.chatHistory.scrollTop = els.chatHistory.scrollHeight;
+}
+
 function renderMessageDom(text: string, sender: ChatSender): HTMLElement {
     const msgDiv = document.createElement('div');
     msgDiv.className = 'message ' + sender;
 
     const contentDiv = document.createElement('div');
-    if (sender === 'ai') {
-        // AI replies are markdown; render and sanitize them for readability.
-        contentDiv.className = 'message-content markdown';
+    if (sender === 'ai' || sender === 'tool') {
+        // AI and tool replies are markdown; render and sanitize them for readability.
+        contentDiv.className = `message-content markdown ${sender === 'tool' ? 'tool-output' : ''}`;
         contentDiv.innerHTML = DOMPurify.sanitize(marked.parse(text, { async: false }));
         msgDiv.appendChild(contentDiv);
     } else {

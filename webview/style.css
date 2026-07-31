@@ -144,6 +144,16 @@ body, html {
     padding: 4px 2px;
 }
 
+.message.tool {
+    align-self: stretch;
+    max-width: 100%;
+    background-color: rgba(128, 128, 128, 0.08);
+    border-left: 4px solid #4caf50;
+    padding: 10px 15px;
+    margin: 0 -15px;
+    border-radius: 0;
+}
+
 .input-area {
     padding: 10px;
     border-top: 1px solid var(--border-color);
@@ -176,6 +186,20 @@ body, html {
     cursor: pointer;
     font-family: monospace;
     font-size: 0.9em;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.mention-base {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mention-dir {
+    font-size: 0.85em;
+    opacity: 0.6;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

@@ -13,21 +13,32 @@ export interface ToolRunResult {
 }
 
 /** Executes accepted tool calls, separating readable results from edit errors. */
-export async function runTools(calls: ToolCall[], sessionFiles: string[]): Promise<ToolRunResult> {
+export async function runTools(
+    calls: ToolCall[],
+    sessionFiles: string[],
+    onChunk?: (chunk: string) => void
+): Promise<ToolRunResult> {
     const results: string[] = [];
     const edits: EditCall[] = [];
 
     for (const call of calls) {
         switch (call.tool) {
-            case 'read_files':
-                results.push(await readFilesResult(call));
+            case 'read_files': {
+                const res = await readFilesResult(call);
+                if (onChunk) onChunk(`**Read Files**\n\`\`\`\n${res}\n\`\`\`\n\n`);
+                results.push(res);
                 break;
-            case 'read_outline':
-                results.push(`## Outline\n${await readOutline(call.paths)}`);
+            }
+            case 'read_outline': {
+                const res = `**Outline**\n${await readOutline(call.paths)}`;
+                if (onChunk) onChunk(`${res}\n\n`);
+                results.push(res);
                 break;
-            case 'run_cmd':
-                results.push(await runCmdResult(call));
+            }
+            case 'run_cmd': {
+                results.push(await runCmdResult(call, onChunk));
                 break;
+            }
             case 'edit':
                 edits.push(call);
                 break;
@@ -41,16 +52,27 @@ export async function runTools(calls: ToolCall[], sessionFiles: string[]): Promi
     };
 }
 
-async function runCmdResult(call: RunCmdCall): Promise<string> {
-    if (!call.repo) {
-        return `## Command\n\`\`\`\n${await runCommand(call.command)}\n\`\`\``;
+async function runCmdResult(call: RunCmdCall, onChunk?: (chunk: string) => void): Promise<string> {
+    let cwd: vscode.Uri | undefined;
+    let repoLabel = 'workspace root';
+    let notice = '';
+
+    if (call.repo) {
+        cwd = resolveRepoUri(call.repo);
+        if (!cwd) {
+            notice = `(unknown repo '${call.repo}': running from workspace root)\n`;
+        } else {
+            repoLabel = call.repo;
+        }
     }
-    const cwd = resolveRepoUri(call.repo);
-    if (!cwd) {
-        const notice = `(unknown repo '${call.repo}': running from workspace root)`;
-        return `## Command\n\`\`\`\n${notice}\n${await runCommand(call.command)}\n\`\`\``;
-    }
-    return `## Command (${call.repo})\n\`\`\`\n${await runCommand(call.command, cwd)}\n\`\`\``;
+
+    if (onChunk) onChunk(`**Command (${repoLabel})**\n\`\`\`text\n${notice}$ ${call.command}\n`);
+
+    const rawOutput = await runCommand(call.command, cwd, onChunk);
+
+    if (onChunk) onChunk(`\n\`\`\`\n\n`);
+
+    return `**Command (${repoLabel})**\n\`\`\`text\n${notice}$ ${call.command}\n${rawOutput}\n\`\`\``;
 }
 
 async function readFilesResult(call: ReadFilesCall): Promise<string> {

@@ -165,6 +165,11 @@ export interface SettingsLoadedMsg {
     settings: AppSettings;
 }
 
+export interface ToolOutputChunkMsg {
+    type: 'toolOutputChunk';
+    chunk: string;
+}
+
 export type HostToWebview =
     | InitStateMsg
     | SessionCreatedMsg
@@ -175,4 +180,5 @@ export type HostToWebview =
     | ContextCopiedMsg
     | PastedMessageMsg
     | ToolResultsMsg
-    | SettingsLoadedMsg;
+    | SettingsLoadedMsg
+    | ToolOutputChunkMsg;

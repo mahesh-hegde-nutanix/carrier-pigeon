@@ -6,16 +6,19 @@ import {
     getMentionedFiles,
     getSessions,
     persistOpenTabs,
+    saveActive,
     setActiveId,
     setSessions,
     setWorkspaceFiles
 } from './state';
 import { renderAll } from './render';
-import { appendMessage } from './messagesUi';
+import { appendMessage, updateMessageDom } from './messagesUi';
 import { handlePaste, handleToolResults } from './toolsUi';
 import { showHistory, openLoadedSession, handleSessionDeleted } from './history';
 import { initSettings, showSettings } from './settings';
 import { autoResizeTextarea, endCopying, finishPendingCopy, initMentions, prefetchWorkspaceFiles, refreshMentionTrigger, updateButtons } from './mentions';
+
+let currentStreamMessage: { text: string, dom: HTMLElement } | null = null;
 
 window.addEventListener('message', (event: MessageEvent<HostToWebview>) => {
     const message = event.data;
@@ -56,7 +59,23 @@ window.addEventListener('message', (event: MessageEvent<HostToWebview>) => {
         case 'pastedMessage':
             if (message.value) handlePaste(message.value);
             break;
+        case 'toolOutputChunk':
+            if (!currentStreamMessage) {
+                currentStreamMessage = { text: message.chunk, dom: appendMessage(message.chunk, 'tool', true) };
+            } else {
+                currentStreamMessage.text += message.chunk;
+                updateMessageDom(currentStreamMessage.dom, currentStreamMessage.text, 'tool');
+            }
+            break;
         case 'toolResults':
+            if (currentStreamMessage) {
+                const active = getActive();
+                if (active) {
+                    active.messages.push({ sender: 'tool', text: currentStreamMessage.text });
+                    saveActive();
+                }
+                currentStreamMessage = null;
+            }
             handleToolResults(message);
             break;
         case 'settingsLoaded':

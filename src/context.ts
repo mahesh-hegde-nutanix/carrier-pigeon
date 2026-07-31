@@ -2,6 +2,10 @@ import * as vscode from 'vscode';
 import { ChatMode } from '../shared/session';
 import { filterIgnored, getSettings } from './settings';
 import { logTiming, timed } from './timing';
+import * as cp from 'child_process';
+import * as util from 'util';
+
+const execFileAsync = util.promisify(cp.execFile);
 
 const SYSTEM_PROMPT_BEGIN = `
 You're an expert software engineering assistant over a chat UI.
@@ -176,14 +180,39 @@ export class WorkspaceFilesCache implements vscode.Disposable {
 }
 
 /**
- * Scans the workspace and drops git-ignored files. The default
- * files.exclude/search.exclude settings still apply (hiding .git,
- * node_modules, etc.); the git filter adds .gitignore handling that findFiles
- * itself does not honor.
+ * Scans the workspace and drops git-ignored files. Uses native git ls-files for speed
+ * where available, falling back to VS Code's findFiles.
  */
 async function scanWorkspaceFiles(): Promise<vscode.Uri[]> {
-    const uris = await vscode.workspace.findFiles('**/*', undefined);
-    return filterGitIgnored(uris);
+    const folders = vscode.workspace.workspaceFolders || [];
+    if (folders.length === 0) return [];
+
+    const uris: vscode.Uri[] = [];
+
+    for (const folder of folders) {
+        let usedGit = false;
+        try {
+            // -z ensures null-separated output for safe path parsing (spaces/quotes)
+            const { stdout } = await execFileAsync('git', ['ls-files', '-z', '-co', '--exclude-standard'], {
+                cwd: folder.uri.fsPath,
+                maxBuffer: 1024 * 1024 * 50 // 50MB limit
+            });
+            const files = stdout.split('\0').filter(Boolean);
+            for (const file of files) {
+                uris.push(vscode.Uri.joinPath(folder.uri, file));
+            }
+            usedGit = true;
+        } catch (e) {
+            console.warn(`[Git] ls-files not available for ${folder.name}, falling back to findFiles`);
+        }
+
+        if (!usedGit) {
+            const pattern = new vscode.RelativePattern(folder, '**/*');
+            const fallbackUris = await vscode.workspace.findFiles(pattern, undefined);
+            uris.push(...fallbackUris);
+        }
+    }
+    return uris;
 }
 
 /** Per-workspace caches shared across context builds. */
@@ -219,45 +248,7 @@ async function getGitApi(): Promise<GitAPI | undefined> {
     }
 }
 
-/**
- * Drops uris that git considers ignored, per each containing repository's
- * ignore rules. Uris outside any repository are kept; all uris are kept when
- * git is unavailable or a repository query fails.
- */
-async function filterGitIgnored(uris: vscode.Uri[]): Promise<vscode.Uri[]> {
-    const git = await getGitApi();
-    if (!git || git.repositories.length === 0) return uris;
 
-    const byRepo = new Map<GitRepository, vscode.Uri[]>();
-    const kept: vscode.Uri[] = [];
-    for (const uri of uris) {
-        const repo = git.getRepository(uri);
-        if (!repo) {
-            kept.push(uri);
-            continue;
-        }
-        const list = byRepo.get(repo);
-        if (list) list.push(uri);
-        else byRepo.set(repo, [uri]);
-    }
-
-    for (const [repo, repoUris] of byRepo) {
-        kept.push(...await keepNotIgnored(repo, repoUris));
-    }
-    return kept;
-}
-
-/** Filters a repository's uris to those git does not ignore, keeping all on error. */
-async function keepNotIgnored(repo: GitRepository, uris: vscode.Uri[]): Promise<vscode.Uri[]> {
-    try {
-        const ignored = await repo.checkIgnore(uris.map(u => u.fsPath));
-        if (ignored.size === 0) return uris;
-        return uris.filter(u => !ignored.has(u.fsPath));
-    } catch (e) {
-        console.error('[GitIgnore] checkIgnore failed; keeping repo files unfiltered:', repo.rootUri.fsPath, e);
-        return uris;
-    }
-}
 
 /** Git repository roots expressed as workspace tree paths. */
 interface GitRoots {
@@ -311,7 +302,7 @@ export async function buildContextPayload(
         try {
             const uris = await timed('files.scan', () => caches.files.get());
             const gitRoots = await getGitRoots();
-            const tree = getWorkspaceTreeString(uris, gitRoots, repoDirs(), getSettings().maxTreeBytes);
+            const tree = getWorkspaceTreeString(uris, gitRoots, repoDirs(), getSettings().maxTreeBytes, req.files);
             buffer.push(`## Workspace Tree\n\`\`\`\n${tree}\`\`\`\n`);
         } catch (treeErr) {
             console.error('[Webview] Error generating workspace tree for context:', treeErr);
@@ -361,7 +352,7 @@ function repoDirs(): Set<string> {
 }
 
 /** Renders an ascii tree from a workspace file listing, marking git and repo roots. */
-function getWorkspaceTreeString(uris: vscode.Uri[], gitRoots: GitRoots, repos: Set<string>, maxChars: number): string {
+function getWorkspaceTreeString(uris: vscode.Uri[], gitRoots: GitRoots, repos: Set<string>, maxChars: number, mentionedFiles: string[] = []): string {
     try {
         console.log(`[CarrierPigeon][timing] tree.fileCount: ${uris.length}`);
         const renderStart = Date.now();
@@ -380,14 +371,22 @@ function getWorkspaceTreeString(uris: vscode.Uri[], gitRoots: GitRoots, repos: S
             });
         }
 
+        let activeTopLevel: string | undefined;
+        if (mentionedFiles.length > 0) {
+            const topLevels = new Set(mentionedFiles.map(f => f.split('/')[0]));
+            if (topLevels.size === 1) {
+                activeTopLevel = [...topLevels][0];
+            }
+        }
+
         // Shrink the depth until the rendered tree fits the char budget, but
         // keep at least TREE_MIN_DEPTH levels so nesting stays visible even in
         // large repos (a smaller budget previously collapsed this to one level).
         let depth = TREE_MAX_DEPTH;
-        let result = printTree(tree, '', 0, depth, '', gitRoots.dirs, repos);
+        let result = printTree(tree, '', 0, depth, '', gitRoots.dirs, repos, activeTopLevel);
         while (result.length > maxChars && depth > TREE_MIN_DEPTH) {
             depth--;
-            result = printTree(tree, '', 0, depth, '', gitRoots.dirs, repos);
+            result = printTree(tree, '', 0, depth, '', gitRoots.dirs, repos, activeTopLevel);
         }
         // A workspace-folder root that is itself a repository has no tree node,
         // so surface it as an explicit root line.
@@ -407,7 +406,8 @@ function printTree(
     maxDepth: number,
     currentPath: string,
     gitRoots: Set<string>,
-    repos: Set<string>
+    repos: Set<string>,
+    activeTopLevel?: string
 ): string {
     if (depth > maxDepth) return '';
     let result = '';
@@ -427,7 +427,11 @@ function printTree(
 
         if (isDir) {
             const nextPrefix = prefix + (isLast ? '    ' : '│   ');
-            result += printTree(node[key] as FileTree, nextPrefix, depth + 1, maxDepth, nextPath, gitRoots, repos);
+            let branchMaxDepth = maxDepth;
+            if (depth === 0 && activeTopLevel && key !== activeTopLevel) {
+                branchMaxDepth = 0;
+            }
+            result += printTree(node[key] as FileTree, nextPrefix, depth + 1, branchMaxDepth, nextPath, gitRoots, repos, activeTopLevel);
         }
     });
     return result;
@@ -472,12 +476,33 @@ async function getFilesContext(filePaths: string[]): Promise<string> {
     let searched = 0;
     for (const filePath of filePaths) {
         try {
-            const content = await readMentionedFile(filePath);
-            if (content !== undefined) {
-                if (content.searched) searched++;
-                buffer.push(fileBlock(filePath, content.text));
+            // Remove trailing slash if present for resolution
+            const cleanPath = filePath.endsWith('/') ? filePath.slice(0, -1) : filePath;
+            const uri = resolveWorkspacePath(cleanPath);
+            let isDir = false;
+            
+            if (uri) {
+                try {
+                    const stat = await vscode.workspace.fs.stat(uri);
+                    if (stat.type === vscode.FileType.Directory) {
+                        isDir = true;
+                    }
+                } catch { }
+            }
+
+            if (isDir && uri) {
+                const pattern = new vscode.RelativePattern(uri, '**/*');
+                const uris = await vscode.workspace.findFiles(pattern, undefined);
+                const treeStr = getWorkspaceTreeString(uris, { dirs: new Set(), rootIsRepo: false }, new Set(), getSettings().maxTreeBytes);
+                buffer.push(fileBlock(cleanPath + ' (Tree)', treeStr));
             } else {
-                console.warn(`[FilesContext] Could not resolve file path: ${filePath}`);
+                const content = await readMentionedFile(cleanPath);
+                if (content !== undefined) {
+                    if (content.searched) searched++;
+                    buffer.push(fileBlock(cleanPath, content.text));
+                } else {
+                    console.warn(`[FilesContext] Could not resolve file path: ${cleanPath}`);
+                }
             }
         } catch (e) {
             console.error(`[FilesContext] Failed to read file context for: ${filePath}`, e);
