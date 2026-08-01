@@ -85,7 +85,9 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
                     workspaceSymbols.push({
                         name: symbol.name,
                         path,
-                        uri: symbol.location.uri.toString()
+                        uri: symbol.location.uri.toString(),
+                        line: symbol.location.range.start.line,
+                        character: symbol.location.range.start.character
                     });
                 }
                 this.post({
@@ -207,7 +209,7 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
         includeCallGraph?: boolean
     ): Promise<void> {
         const start = Date.now();
-        const payload = await buildContextPayload(
+        const { payload, details } = await buildContextPayload(
             { text, files, isInitial, mode, includeCallGraph },
             { rules: this.rulesCache, files: this.filesCache, skills: await this.skills() }
         );
@@ -216,7 +218,7 @@ export class AIChatViewProvider implements vscode.WebviewViewProvider {
             '$(clippy) Carrier Pigeon: context copied to clipboard',
             3000
         );
-        this.post({ type: 'contextCopied', sessionId, text });
+        this.post({ type: 'contextCopied', sessionId, text, details });
         logTiming('copyContext total', start);
     }
 

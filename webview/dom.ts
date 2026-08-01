@@ -29,6 +29,7 @@ export const els = {
     mentionPopup: byId<HTMLDivElement>('mention-popup'),
     modeSelect: byId<HTMLSelectElement>('mode-select'),
     callGraphCheck: byId<HTMLInputElement>('call-graph-check'),
+    callGraphError: byId<HTMLSpanElement>('call-graph-error'),
     tabs: byId<HTMLDivElement>('tabs'),
     historyOverlay: byId<HTMLDivElement>('history-overlay'),
     historyList: byId<HTMLDivElement>('history-list'),

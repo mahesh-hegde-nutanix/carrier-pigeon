@@ -18,6 +18,7 @@ import { handlePaste, handleToolResults } from './toolsUi';
 import { showHistory, openLoadedSession, handleSessionDeleted } from './history';
 import { initSettings, showSettings } from './settings';
 import { autoResizeTextarea, endCopying, finishPendingCopy, handleSelectionMatchResult, initMentions, prefetchWorkspaceFiles, refreshMentionTrigger, showSymbolResults, updateButtons } from './mentions';
+import { ContextBuildDetails } from '../shared/protocol';
 
 let currentStreamMessage: { text: string, dom: HTMLElement } | null = null;
 
@@ -59,7 +60,7 @@ window.addEventListener('message', (event: MessageEvent<HostToWebview>) => {
             showSymbolResults(message.requestId, message.symbols);
             break;
         case 'contextCopied':
-            onContextCopied(message.sessionId, message.text);
+            onContextCopied(message.sessionId, message.text, message.details);
             break;
         case 'pastedMessage':
             if (message.value) handlePaste(message.value);
@@ -92,8 +93,8 @@ window.addEventListener('message', (event: MessageEvent<HostToWebview>) => {
     }
 });
 
-function onContextCopied(sessionId: string, text: string): void {
-    endCopying(sessionId);
+function onContextCopied(sessionId: string, text: string, details?: ContextBuildDetails): void {
+    endCopying(sessionId, details);
     const active = getActive();
     if (!active || active.id !== sessionId) return;
     getMentionedFiles(text).forEach(f => {

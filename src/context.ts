@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { ChatMode } from '../shared/session';
+import { ContextBuildDetails } from '../shared/protocol';
 import { filterIgnored, getSettings } from './settings';
 import { logTiming, timed } from './timing';
 import { SkillRegistry } from './skills';
@@ -303,10 +304,15 @@ async function getGitRoots(): Promise<GitRoots> {
 }
 
 /** Builds the full clipboard payload for a copy-context request. */
+export interface ContextBuildResult {
+    payload: string;
+    details: ContextBuildDetails;
+}
+
 export async function buildContextPayload(
     req: ContextRequest,
     caches: ContextCaches
-): Promise<string> {
+): Promise<ContextBuildResult> {
     const start = Date.now();
     const buffer: string[] = [];
 
@@ -347,6 +353,7 @@ export async function buildContextPayload(
         console.error('[Webview] Error fetching mentioned files for context:', filesErr);
     }
 
+    const details: ContextBuildDetails = {};
     if (req.includeCallGraph) {
         try {
             const { generateCallGraphContext } = await import('./callGraph');
@@ -354,15 +361,17 @@ export async function buildContextPayload(
             if (callGraphContext) {
                 buffer.push(`## Call Graph\n\`\`\`\n${callGraphContext}\n\`\`\`\n`);
             } else {
-                console.log('[Context] Call graph was requested but returned empty or timed out.');
+                console.log('[Context] Call graph was requested but returned empty.');
+                details.callGraphError = 'Empty call graph. Ensure valid symbols are mentioned and resolved.';
             }
-        } catch (cgErr) {
+        } catch (cgErr: any) {
             console.error('[Webview] Error generating call graph:', cgErr);
+            details.callGraphError = cgErr?.message || String(cgErr);
         }
     }
 
     logTiming(`buildContextPayload (initial=${req.isInitial})`, start);
-    return buffer.join('\n');
+    return { payload: buffer.join('\n'), details };
 }
 
 function systemPrompt(mode: ChatMode, skills: SkillRegistry): string {

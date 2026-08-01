@@ -1,5 +1,5 @@
 import { els, post } from './dom';
-import { WorkspaceSymbol, SelectionMatchResultMsg } from '../shared/protocol';
+import { WorkspaceSymbol, SelectionMatchResultMsg, ContextBuildDetails } from '../shared/protocol';
 import { getActive, getMentionedFiles, getSkills, getWorkspaceFiles, saveActive } from './state';
 
 interface MentionState {
@@ -45,6 +45,8 @@ export function initMentions(): void {
     });
 
     els.chatInput.addEventListener('input', () => {
+        els.callGraphError.style.display = 'none';
+        els.callGraphError.title = '';
         autoResizeTextarea();
         checkMentionTrigger();
         updateButtons();
@@ -110,12 +112,19 @@ export function updateButtons(): void {
 }
 
 /** Clears the copy-in-progress state once the host responds. */
-export function endCopying(sessionId: string): void {
+export function endCopying(sessionId: string, details?: ContextBuildDetails): void {
     if (copyingSessionId !== sessionId) return;
     copying = false;
     copyingSessionId = null;
     setInputBlocked(false);
     els.callGraphCheck.checked = false;
+    if (details?.callGraphError) {
+        els.callGraphError.style.display = 'flex';
+        els.callGraphError.title = details.callGraphError;
+    } else {
+        els.callGraphError.style.display = 'none';
+        els.callGraphError.title = '';
+    }
     updateButtons();
 }
 
@@ -137,6 +146,9 @@ export function autoResizeTextarea(): void {
 function performCopy(): void {
     const active = getActive();
     if (!active || !els.chatInput.value.trim()) return;
+
+    els.callGraphError.style.display = 'none';
+    els.callGraphError.title = '';
 
     // Refresh the file list before scanning so @mentions that were pasted
     // (and thus never triggered a file fetch) are still resolved. The copy is
@@ -272,16 +284,23 @@ export function showSymbolResults(requestId: number, symbols: WorkspaceSymbol[])
     }
     filteredItems = symbols.slice(0, MAX_MENTION_RESULTS).map(symbol => {
         const unqualifiedName = symbol.name.split(/[\.:]+/).pop() || symbol.name;
+        
         let shortPath = symbol.path;
         if (shortPath.length > 40) {
             shortPath = '...' + shortPath.slice(-37);
         }
+        
+        let insertText = `@${symbol.path} (${unqualifiedName})`;
+        if (symbol.line !== undefined && symbol.character !== undefined) {
+            insertText = `#${symbol.path}:${symbol.line + 1}:${symbol.character + 1} (${unqualifiedName})`;
+        }
+        
         return {
             value: unqualifiedName,
             label: unqualifiedName,
             detail: shortPath,
             kind: 'symbol',
-            insertText: `@${symbol.path} (${unqualifiedName})`
+            insertText
         };
     });
     if (filteredItems.length > 0) {

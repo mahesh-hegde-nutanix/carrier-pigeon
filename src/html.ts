@@ -48,10 +48,13 @@ export function getHtmlForWebview(webview: vscode.Webview, extensionUri: vscode.
                 <option value="edit" selected>&#9998; EDIT MODE</option>
                 <option value="ask">&#128172; ASK MODE</option>
             </select>
-            <label style="font-size: 0.8em; margin-left: 10px; margin-right: auto; cursor: pointer; display: flex; align-items: center; gap: 4px; color: var(--vscode-descriptionForeground);">
-                <input type="checkbox" id="call-graph-check" /> callgraph
+            <div class="action-buttons-container" id="action-buttons-container" style="margin-left: auto;"></div>
+        </div>
+        <div class="input-options-row" style="display: flex; align-items: center; gap: 8px; margin-top: 6px;">
+            <label style="font-size: 0.8em; cursor: pointer; display: flex; align-items: center; gap: 4px; color: var(--vscode-descriptionForeground);">
+                <input type="checkbox" id="call-graph-check" /> Include CallGraph (Experimental & slow)
             </label>
-            <div class="action-buttons-container" id="action-buttons-container"></div>
+            <span id="call-graph-error" style="color: var(--vscode-errorForeground); font-size: 0.85em; display: none; cursor: help; align-items: center; gap: 4px;">&#9888; Error</span>
         </div>
     </div>
 

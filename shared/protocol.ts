@@ -160,6 +160,8 @@ export interface WorkspaceSymbol {
     name: string;
     path: string;
     uri: string;
+    line?: number;
+    character?: number;
 }
 
 export interface SymbolListMsg {
@@ -168,10 +170,15 @@ export interface SymbolListMsg {
     symbols: WorkspaceSymbol[];
 }
 
+export interface ContextBuildDetails {
+    callGraphError?: string;
+}
+
 export interface ContextCopiedMsg {
     type: 'contextCopied';
     sessionId: string;
     text: string;
+    details?: ContextBuildDetails;
 }
 
 export interface PastedMessageMsg {
