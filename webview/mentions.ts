@@ -13,7 +13,7 @@ interface CompletionItem {
     value: string;
     label: string;
     detail: string;
-    kind: 'file' | 'skill' | 'symbol';
+    kind: 'file' | 'skill' | 'symbol' | 'dir';
     insertText?: string;
 }
 
@@ -30,6 +30,8 @@ let latestSymbolRequestId = 0;
 // True while the host is building the context payload (potentially slow FS work).
 let copying = false;
 let copyingSessionId: string | null = null;
+let toolRunning = false;
+let toolRunningSessionId: string | null = null;
 // A copy is queued, waiting on a fresh file list so pasted @mentions resolve.
 let pendingCopy = false;
 let pendingPaste: { text: string, start: number, end: number } | null = null;
@@ -75,7 +77,7 @@ export function handleSelectionMatchResult(msg: SelectionMatchResultMsg): void {
 
     let inserted = msg.text;
     if (msg.filePath && msg.startLine !== undefined && msg.endLine !== undefined) {
-        inserted = `@${msg.filePath}:${msg.startLine}-${msg.endLine}\n\`\`\`\n${msg.text}\n\`\`\``;
+        inserted = `@${msg.filePath}:${msg.startLine}-${msg.endLine}\n\n\`\`\`\n${msg.text}\n\`\`\``;
     }
 
     els.chatInput.focus();
@@ -102,7 +104,9 @@ export function updateButtons(): void {
     if (!active) return;
 
     if (copying) {
-        els.actionButtons.appendChild(createLoadingButton());
+        els.actionButtons.appendChild(createLoadingButton(' COPYING\u2026'));
+    } else if (toolRunning && toolRunningSessionId === active.id) {
+        els.actionButtons.appendChild(createLoadingButton(' RUNNING\u2026'));
     } else if (els.chatInput.value.trim().length > 0) {
         els.actionButtons.appendChild(createActionButton(COPY_ICON, ' COPY CONTEXT', performCopy));
     }
@@ -111,12 +115,19 @@ export function updateButtons(): void {
     }
 }
 
+export function setToolRunningState(running: boolean, sessionId?: string): void {
+    toolRunning = running;
+    toolRunningSessionId = sessionId || null;
+    setInputBlocked(copying || toolRunning);
+    updateButtons();
+}
+
 /** Clears the copy-in-progress state once the host responds. */
 export function endCopying(sessionId: string, details?: ContextBuildDetails): void {
     if (copyingSessionId !== sessionId) return;
     copying = false;
     copyingSessionId = null;
-    setInputBlocked(false);
+    setInputBlocked(copying || toolRunning);
     els.callGraphCheck.checked = false;
     if (details?.callGraphError) {
         els.callGraphError.style.display = 'flex';
@@ -134,7 +145,7 @@ export function cancelCopyForSession(sessionId: string): void {
     pendingCopy = false;
     copying = false;
     copyingSessionId = null;
-    setInputBlocked(false);
+    setInputBlocked(copying || toolRunning);
     updateButtons();
 }
 
@@ -171,7 +182,7 @@ export function finishPendingCopy(): void {
     if (!active || active.id !== copyingSessionId || !text) {
         copying = false;
         copyingSessionId = null;
-        setInputBlocked(false);
+        setInputBlocked(copying || toolRunning);
         updateButtons();
         return;
     }
@@ -200,11 +211,11 @@ function createActionButton(icon: string, label: string, onClick: () => void): H
     return btn;
 }
 
-function createLoadingButton(): HTMLButtonElement {
+function createLoadingButton(text: string): HTMLButtonElement {
     const btn = document.createElement('button');
     btn.className = 'action-button';
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> COPYING\u2026';
+    btn.innerHTML = `<span class="spinner"></span>${text}`;
     return btn;
 }
 
@@ -418,12 +429,14 @@ const PASTE_ICON =
 
 function fileCompletionItems(): CompletionItem[] {
     return getWorkspacePaths().map(value => {
-        const lastSlash = value.lastIndexOf('/');
+        const isDir = value.endsWith('/');
+        const cleanPath = isDir ? value.slice(0, -1) : value;
+        const lastSlash = cleanPath.lastIndexOf('/');
         return {
             value,
-            label: lastSlash >= 0 ? value.substring(lastSlash + 1) : value,
-            detail: lastSlash >= 0 ? value.substring(0, lastSlash + 1) : '',
-            kind: 'file'
+            label: lastSlash >= 0 ? cleanPath.substring(lastSlash + 1) + (isDir ? '/' : '') : value,
+            detail: lastSlash >= 0 ? cleanPath.substring(0, lastSlash + 1) : '',
+            kind: isDir ? 'dir' : 'file'
         };
     });
 }

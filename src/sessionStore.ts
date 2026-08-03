@@ -44,7 +44,8 @@ export class SessionStore {
             name: session.name,
             createdAt: session.createdAt,
             updatedAt: session.updatedAt,
-            messageCount: (session.messages || []).length
+            messageCount: (session.messages || []).length,
+            firstMessage: (session.messages && session.messages.length > 0) ? session.messages[0].text.substring(0, 80) : null
         };
         await this.context.workspaceState.update(SESSIONS_STATE_KEY, summaries);
     }
@@ -102,7 +103,8 @@ export class SessionStore {
                     name: s.name,
                     createdAt: s.createdAt,
                     updatedAt: s.updatedAt,
-                    messageCount: (s.messages || []).length
+                    messageCount: (s.messages || []).length,
+                    firstMessage: (s.messages && s.messages.length > 0) ? s.messages[0].text.substring(0, 80) : null
                 };
             } catch (e) {
                 console.error('[CarrierPigeon] Failed to read session file for indexing:', name, e);

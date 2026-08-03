@@ -8,10 +8,13 @@ export interface AppSettings {
     // Regexes (matched against workspace-relative paths) excluded from workspace
     // scans, on top of VS Code's default excludes.
     ignorePatterns: string[];
+    // Timeout in milliseconds for call graph generation.
+    callGraphTimeoutMs: number;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
     customInstructions: '',
     maxTreeBytes: 16000,
-    ignorePatterns: []
+    ignorePatterns: [],
+    callGraphTimeoutMs: 120000
 };

@@ -43,5 +43,6 @@ export const els = {
     settingsInstructions: byId<HTMLTextAreaElement>('settings-instructions'),
     settingsTreeBytes: byId<HTMLInputElement>('settings-tree-bytes'),
     settingsIgnore: byId<HTMLTextAreaElement>('settings-ignore'),
+    settingsCallGraphTimeout: byId<HTMLInputElement>('settings-callgraph-timeout'),
     settingsSave: byId<HTMLButtonElement>('settings-save')
 };

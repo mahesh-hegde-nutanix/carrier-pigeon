@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { resolveWorkspacePath } from './context';
+import { getSettings } from './settings';
 
 interface GraphNode {
     item: vscode.CallHierarchyItem;
@@ -18,10 +19,11 @@ function escapeRegExp(value: string): string {
 }
 
 export async function generateCallGraphContext(text: string, files: string[], maxDepth = 1): Promise<string> {
-    // Enforce 2-minute timeout ceiling to ensure context compilation doesn't lock up
+    const timeoutMs = getSettings().callGraphTimeoutMs;
+    // Enforce configurable timeout ceiling to ensure context compilation doesn't lock up
     return await Promise.race([
         buildGraph(text, files, maxDepth),
-        new Promise<string>((_, reject) => setTimeout(() => reject(new Error('Graph generation timed out after 120 seconds')), 120000))
+        new Promise<string>((_, reject) => setTimeout(() => reject(new Error(`Graph generation timed out after ${timeoutMs / 1000} seconds`)), timeoutMs))
     ]);
 }
 

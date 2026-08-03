@@ -83,6 +83,9 @@ export function getHtmlForWebview(webview: vscode.Webview, extensionUri: vscode.
             <div class="settings-hint">Comma-separated regexes, matched against workspace-relative paths.</div>
             <textarea id="settings-ignore" class="settings-textarea" rows="3"></textarea>
 
+            <label class="settings-label" for="settings-callgraph-timeout">Call graph timeout (ms)</label>
+            <input id="settings-callgraph-timeout" class="settings-input" type="number" min="0" />
+
             <button id="settings-save" class="settings-save">Save</button>
         </div>
     </div>

@@ -27,6 +27,7 @@ export interface SessionSummary {
     createdAt: string;
     updatedAt: string;
     messageCount: number;
+    firstMessage?: string | null;
 }
 
 /** Persisted set of tabs and which one is active. */

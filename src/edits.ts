@@ -33,7 +33,20 @@ export async function applyEdits(edits: EditCall[], sessionFiles: string[]): Pro
         const edit = edits[i];
         const uri = await resolveFile(edit.path);
         if (!uri) {
-            failures.push({ path: edit.path, reason: 'file not found' });
+            if (edit.search.trim() !== '') {
+                failures.push({ path: edit.path, reason: 'file not found and search block is not empty. To create a new file, provide an empty search block.' });
+                continue;
+            }
+            
+            const newUri = resolveWorkspacePath(edit.path);
+            if (!newUri) {
+                failures.push({ path: edit.path, reason: 'file not found and could not resolve workspace path for creation' });
+                continue;
+            }
+            
+            workspaceEdit.createFile(newUri, { ignoreIfExists: true });
+            workspaceEdit.insert(newUri, new vscode.Position(0, 0), edit.replace);
+            if (!editedUris.some(u => u.toString() === newUri.toString())) editedUris.push(newUri);
             continue;
         }
         const doc = await vscode.workspace.openTextDocument(uri);

@@ -11,7 +11,8 @@
     "compile": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
     "check": "tsc --noEmit",
-    "vscode:prepublish": "node esbuild.mjs --production"
+    "vscode:prepublish": "node esbuild.mjs --production",
+    "package": "npm run check && node esbuild.mjs --production"
   },
   "devDependencies": {
     "@types/node": "^26.1.2",

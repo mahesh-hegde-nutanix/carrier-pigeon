@@ -10,6 +10,7 @@ export function showSettings(settings: AppSettings): void {
     els.settingsInstructions.value = settings.customInstructions;
     els.settingsTreeBytes.value = String(settings.maxTreeBytes);
     els.settingsIgnore.value = settings.ignorePatterns.join(', ');
+    els.settingsCallGraphTimeout.value = String(settings.callGraphTimeoutMs);
     els.settingsOverlay.classList.add('active');
 }
 
@@ -19,13 +20,15 @@ function closeSettings(): void {
 
 function saveSettings(): void {
     const bytes = parseInt(els.settingsTreeBytes.value, 10);
+    const timeout = parseInt(els.settingsCallGraphTimeout.value, 10);
     const settings: AppSettings = {
         customInstructions: els.settingsInstructions.value,
         maxTreeBytes: Number.isNaN(bytes) ? DEFAULT_SETTINGS.maxTreeBytes : bytes,
         ignorePatterns: els.settingsIgnore.value
             .split(',')
             .map(p => p.trim())
-            .filter(p => p.length > 0)
+            .filter(p => p.length > 0),
+        callGraphTimeoutMs: Number.isNaN(timeout) ? DEFAULT_SETTINGS.callGraphTimeoutMs : timeout
     };
     post({ type: 'updateSettings', settings });
     closeSettings();

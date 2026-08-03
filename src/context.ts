@@ -28,9 +28,8 @@ Git repository roots in the file trees will be marked '[GIT]'.
 In a multi-repo workspace, individual repo roots are marked '[repo]'; a '[repo]' name may be passed as the run_cmd 'repo' parameter.
 gitignored files will not be shown by the trees - use find/ls if you must.
 
-Reminder: these files / repos are not on your system. The user is communicating via a chat.
-
-Provide the tool calls in format described so that the user can execute them and relay the results.
+Reminder: these files / repos are not on your system and thus the tools below (read_files, run_cmd etc...) can't be executed there.
+Include the tool calls in the fenced format within your message, so that the user can execute them and relay the results.
 `;
 
 const EDIT_MODE_PROMPT = `
@@ -46,14 +45,16 @@ No need to produce edits in that case.
 To update a file, provide a search-replace diff inside markdown code block.
 
 `+ "```" + `
->>> SEARCH file_path_or_name
+>>> SEARCH file_path
 existing code
 ===
 new code
 <<< REPLACE
 `+ "```" + `
 
-File update is a special tool which takes this format. 
+To create a new file, just set an empty search block and replace block with new file's content.
+
+File update is a special tool which takes this format.
 Other tools are to be called in JSON format wrapped in code blocks. They are described later.
 `;
 
@@ -82,7 +83,7 @@ Read the symbol outline of all files in a path. Use it with whole packages to un
 Example:
 
 ` + "```" + `
-{"tool": "read_outline", "paths": ["my/repo/package"]}
+{"tool": "read_outline", "paths": ["my/package/"]}
 ` + "```" + `
 
 ---
@@ -347,7 +348,8 @@ export async function buildContextPayload(
     }
 
     try {
-        const filesContext = await getFilesContext(req.files);
+        const { files: filesContext, dirs: dirsContext } = await getFilesContext(req.files);
+        if (dirsContext) buffer.push(`## Referenced Directories\n${dirsContext}\n`);
         if (filesContext) buffer.push(`## Referenced Files\n${filesContext}\n`);
     } catch (filesErr) {
         console.error('[Webview] Error fetching mentioned files for context:', filesErr);
@@ -525,9 +527,10 @@ async function getRuleFilesContext(): Promise<string> {
     }
 }
 
-async function getFilesContext(filePaths: string[]): Promise<string> {
+async function getFilesContext(filePaths: string[]): Promise<{ files: string; dirs: string }> {
     const start = Date.now();
-    const buffer: string[] = [];
+    const fileBuffer: string[] = [];
+    const dirBuffer: string[] = [];
     let searched = 0;
     for (const filePath of filePaths) {
         try {
@@ -549,12 +552,12 @@ async function getFilesContext(filePaths: string[]): Promise<string> {
                 const pattern = new vscode.RelativePattern(uri, '**/*');
                 const uris = await vscode.workspace.findFiles(pattern, undefined);
                 const treeStr = getWorkspaceTreeString(uris, { dirs: new Set(), rootIsRepo: false }, new Set(), getSettings().maxTreeBytes);
-                buffer.push(fileBlock(cleanPath + ' (Tree)', treeStr));
+                dirBuffer.push(fileBlock(cleanPath + ' (Tree)', treeStr));
             } else {
                 const content = await readMentionedFile(cleanPath);
                 if (content !== undefined) {
                     if (content.searched) searched++;
-                    buffer.push(fileBlock(cleanPath, content.text));
+                    fileBuffer.push(fileBlock(cleanPath, content.text));
                 } else {
                     console.warn(`[FilesContext] Could not resolve file path: ${cleanPath}`);
                 }
@@ -564,7 +567,7 @@ async function getFilesContext(filePaths: string[]): Promise<string> {
         }
     }
     logTiming(`mentionedFiles (${filePaths.length} files, ${searched} searched)`, start);
-    return buffer.join('\n');
+    return { files: fileBuffer.join('\n'), dirs: dirBuffer.join('\n') };
 }
 
 interface MentionedFileContent {

@@ -17,7 +17,7 @@ import { appendMessage, updateMessageDom } from './messagesUi';
 import { handlePaste, handleToolResults } from './toolsUi';
 import { showHistory, openLoadedSession, handleSessionDeleted } from './history';
 import { initSettings, showSettings } from './settings';
-import { autoResizeTextarea, endCopying, finishPendingCopy, handleSelectionMatchResult, initMentions, prefetchWorkspaceFiles, refreshMentionTrigger, showSymbolResults, updateButtons } from './mentions';
+import { autoResizeTextarea, endCopying, finishPendingCopy, handleSelectionMatchResult, initMentions, prefetchWorkspaceFiles, refreshMentionTrigger, showSymbolResults, updateButtons, setToolRunningState } from './mentions';
 import { ContextBuildDetails } from '../shared/protocol';
 
 let currentStreamMessage: { text: string, dom: HTMLElement } | null = null;
@@ -85,6 +85,7 @@ window.addEventListener('message', (event: MessageEvent<HostToWebview>) => {
                 }
                 currentStreamMessage = null;
             }
+            setToolRunningState(false);
             handleToolResults(message);
             break;
         case 'settingsLoaded':

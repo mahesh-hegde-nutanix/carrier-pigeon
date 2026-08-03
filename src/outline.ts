@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { filterIgnored } from './settings';
+import { resolveWorkspacePath, toFolderRelative } from './context';
 
 // Symbol kinds worth descending into. Function/method bodies are intentionally
 // excluded so their local variables never bloat the outline.
@@ -40,10 +41,25 @@ export async function readOutline(paths: string[]): Promise<string> {
 
 /** Resolves a path (file, directory, or glob) to matching file URIs. */
 async function resolveFiles(path: string): Promise<vscode.Uri[]> {
-    const direct = await vscode.workspace.findFiles(path, null);
+    const uri = resolveWorkspacePath(path);
+    if (uri) {
+        try {
+            const stat = await vscode.workspace.fs.stat(uri);
+            if (stat.type !== vscode.FileType.Directory) {
+                return filterIgnored([uri]);
+            }
+        } catch {
+            // Not a plain file (e.g. a glob pattern); fall through to search.
+        }
+    }
+
+    const relPath = toFolderRelative(path);
+    const direct = await vscode.workspace.findFiles(relPath, null);
     if (direct.length > 0) return filterIgnored(direct);
-    const clean = path.replace(/\/+$/, '');
-    return filterIgnored(await vscode.workspace.findFiles(`${clean}/**`, null));
+    
+    const clean = relPath.replace(/\/+$/, '');
+    const glob = clean ? `${clean}/**` : '**';
+    return filterIgnored(await vscode.workspace.findFiles(glob, null));
 }
 
 async function fileOutline(uri: vscode.Uri): Promise<string> {

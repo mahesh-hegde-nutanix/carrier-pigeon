@@ -23,13 +23,23 @@ export function showHistory(sessions: SessionSummary[]): void {
         item.onclick = () => openHistoryItem(s.id);
 
         const left = document.createElement('div');
+
         const nm = document.createElement('div');
         nm.textContent = s.name;
+        left.appendChild(nm);
+
+        if (s.firstMessage) {
+            const sub = document.createElement('div');
+            sub.className = 'h-subtitle';
+            const text = s.firstMessage.trim();
+            sub.textContent = text.length > 80 ? text.substring(0, 80) + '...' : text;
+            left.appendChild(sub);
+        }
+
         const meta = document.createElement('div');
         meta.className = 'h-meta';
         const when = s.updatedAt ? new Date(s.updatedAt).toLocaleString() : '';
         meta.textContent = (s.messageCount || 0) + ' messages \u00b7 ' + when;
-        left.appendChild(nm);
         left.appendChild(meta);
         item.appendChild(left);
 

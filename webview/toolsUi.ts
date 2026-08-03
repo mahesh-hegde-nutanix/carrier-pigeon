@@ -3,6 +3,7 @@ import { ToolResultsMsg } from '../shared/protocol';
 import { els, post } from './dom';
 import { getActive } from './state';
 import { appendMessage } from './messagesUi';
+import { setToolRunningState } from './mentions';
 
 // The AI message that carried the currently pending tool calls; a COPY ERRORS
 // button attaches here if the edits report problems.
@@ -70,10 +71,14 @@ function renderPendingTools(calls: ToolCall[]): void {
     accept.onclick = () => {
         const selected = calls.filter((_, i) => checkboxes[i].checked);
         if (selected.length === 0) return;
+        const active = getActive();
+        if (active) {
+            setToolRunningState(true, active.id);
+        }
         post({
             type: 'executeTools',
             calls: selected,
-            sessionFiles: getActive()?.mentionedFiles ?? []
+            sessionFiles: active?.mentionedFiles ?? []
         });
         clearPendingTools();
     };

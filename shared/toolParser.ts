@@ -39,6 +39,8 @@ export type ToolCall = ReadFilesCall | ReadOutlineCall | ReadSkillCall | RunCmdC
 
 const SEARCH_PREFIX = '>>> SEARCH ';
 const REPLACE_PREFIX = '<<< REPLACE';
+const SEARCH_PREFIX_ALT = '<<< SEARCH ';
+const REPLACE_PREFIX_ALT = '>>> REPLACE';
 const SEPARATOR = '===';
 
 /** Extracts every tool call from an AI reply. Empty when the reply is prose. */
@@ -50,7 +52,7 @@ export function parseAiMessage(text: string): ToolCall[] {
     // surrounding fences. If the whole message looks like a tool block, parse
     // it directly.
     const trimmed = text.trim();
-    if (trimmed.startsWith('{') || trimmed.startsWith(SEARCH_PREFIX)) {
+    if (trimmed.startsWith('{') || trimmed.startsWith(SEARCH_PREFIX) || trimmed.startsWith(SEARCH_PREFIX_ALT)) {
         return parseBlock(trimmed);
     }
     return calls;
@@ -58,7 +60,7 @@ export function parseAiMessage(text: string): ToolCall[] {
 
 /** Routes a single block to the matching parser. */
 function parseBlock(block: string): ToolCall[] {
-    return block.includes(SEARCH_PREFIX) ? parseEditBlock(block) : parseJsonlBlock(block);
+    return (block.includes(SEARCH_PREFIX) || block.includes(SEARCH_PREFIX_ALT)) ? parseEditBlock(block) : parseJsonlBlock(block);
 }
 
 /** Yields the inner content of each fenced code block. */
@@ -75,11 +77,18 @@ function parseEditBlock(block: string): EditCall[] {
     const lines = block.split('\n');
     let i = 0;
     while (i < lines.length) {
-        if (!lines[i].startsWith(SEARCH_PREFIX)) {
+        const isPrimary = lines[i].startsWith(SEARCH_PREFIX);
+        const isAlt = lines[i].startsWith(SEARCH_PREFIX_ALT);
+        
+        if (!isPrimary && !isAlt) {
             i++;
             continue;
         }
-        const path = lines[i].slice(SEARCH_PREFIX.length).trim();
+        
+        const currentSearchPrefix = isPrimary ? SEARCH_PREFIX : SEARCH_PREFIX_ALT;
+        const currentReplacePrefix = isPrimary ? REPLACE_PREFIX : REPLACE_PREFIX_ALT;
+        
+        const path = lines[i].slice(currentSearchPrefix.length).trim();
         i++;
         const search: string[] = [];
         while (i < lines.length && lines[i].trim() !== SEPARATOR) {
@@ -88,7 +97,7 @@ function parseEditBlock(block: string): EditCall[] {
         }
         i++; // skip separator
         const replace: string[] = [];
-        while (i < lines.length && !lines[i].startsWith(REPLACE_PREFIX)) {
+        while (i < lines.length && !lines[i].startsWith(currentReplacePrefix)) {
             replace.push(lines[i]);
             i++;
         }
