@@ -20,6 +20,14 @@ import { initSettings, showSettings } from './settings';
 import { autoResizeTextarea, endCopying, finishPendingCopy, handleSelectionMatchResult, initMentions, prefetchWorkspaceFiles, refreshMentionTrigger, showSymbolResults, updateButtons, setToolRunningState } from './mentions';
 import { ContextBuildDetails } from '../shared/protocol';
 
+export function syncModeUI() {
+    const active = getActive();
+    if (!active) return;
+    const mode = active.mode || 'edit';
+    els.modeBtnAsk.classList.toggle('active', mode === 'ask');
+    els.modeBtnEdit.classList.toggle('active', mode === 'edit');
+}
+
 let currentStreamMessage: { text: string, dom: HTMLElement } | null = null;
 
 window.addEventListener('message', (event: MessageEvent<HostToWebview>) => {

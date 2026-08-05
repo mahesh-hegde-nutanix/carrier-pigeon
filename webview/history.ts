@@ -44,8 +44,7 @@ export function showHistory(sessions: SessionSummary[]): void {
         item.appendChild(left);
 
         const del = document.createElement('span');
-        del.className = 'h-del';
-        del.textContent = '\uD83D\uDDD1';
+        del.className = 'h-del codicon codicon-trash';
         del.title = 'Delete';
         del.onclick = (e) => {
             e.stopPropagation();

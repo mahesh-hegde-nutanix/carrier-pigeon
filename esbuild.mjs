@@ -1,4 +1,5 @@
 import * as esbuild from 'esbuild';
+import * as fs from 'fs';
 
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
@@ -31,6 +32,10 @@ const webviewConfig = {
 };
 
 async function main() {
+    fs.mkdirSync('dist', { recursive: true });
+    fs.copyFileSync('node_modules/@vscode/codicons/dist/codicon.css', 'dist/codicon.css');
+    fs.copyFileSync('node_modules/@vscode/codicons/dist/codicon.ttf', 'dist/codicon.ttf');
+
     if (watch) {
         const contexts = await Promise.all([
             esbuild.context(hostConfig),

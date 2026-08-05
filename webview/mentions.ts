@@ -17,7 +17,7 @@ interface CompletionItem {
     insertText?: string;
 }
 
-const MAX_TEXTAREA_HEIGHT = 120;
+const MAX_TEXTAREA_HEIGHT = 200;
 const MAX_MENTION_RESULTS = 50;
 const SYMBOL_SEARCH_DELAY_MS = 150;
 
@@ -38,13 +38,18 @@ let pendingPaste: { text: string, start: number, end: number } | null = null;
 
 /** Attaches all input-area listeners. Call once on startup. */
 export function initMentions(): void {
-    els.modeSelect.addEventListener('change', () => {
+    const setMode = (mode: 'ask' | 'edit') => {
+        els.modeBtnAsk.classList.toggle('active', mode === 'ask');
+        els.modeBtnEdit.classList.toggle('active', mode === 'edit');
         const active = getActive();
         if (active) {
-            active.mode = els.modeSelect.value as 'ask' | 'edit';
+            active.mode = mode;
             saveActive();
         }
-    });
+    };
+
+    els.modeBtnAsk.addEventListener('click', () => setMode('ask'));
+    els.modeBtnEdit.addEventListener('click', () => setMode('edit'));
 
     els.chatInput.addEventListener('input', () => {
         els.callGraphError.style.display = 'none';

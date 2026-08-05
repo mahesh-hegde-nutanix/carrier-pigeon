@@ -89,6 +89,9 @@ body, html {
 }
 
 .tab-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
     background: transparent;
     border: none;
     color: var(--vscode-foreground);
@@ -229,8 +232,7 @@ textarea {
     border-radius: 4px;
     resize: none;
     font-family: inherit;
-    min-height: 40px;
-    max-height: 120px;
+    max-height: 200px;
     overflow-y: auto;
 }
 
@@ -339,21 +341,47 @@ textarea:focus {
     margin-top: 10px;
 }
 
-.mode-selector {
-    background: var(--vscode-dropdown-background);
-    color: var(--vscode-dropdown-foreground);
-    border: 1px solid var(--vscode-dropdown-border);
+.input-options-row {
+    margin-top: 10px;
+}
+
+.mode-segmented-control {
+    display: flex;
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+}
+
+.mode-segment-btn {
+    background: transparent;
+    color: var(--vscode-foreground);
+    border: none;
     padding: 6px 12px;
-    border-radius: 8px;
     font-family: inherit;
     font-size: 0.85em;
     font-weight: 500;
     cursor: pointer;
     outline: none;
+    opacity: 0.7;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
-.mode-selector:focus {
-    outline: 1px solid var(--vscode-focusBorder);
+.mode-segment-btn:hover {
+    background: var(--popup-hover);
+    opacity: 1;
+}
+
+.mode-segment-btn.active {
+    background: var(--input-bg);
+    opacity: 1;
+    font-weight: bold;
+}
+
+.mode-segment-btn:first-child {
+    border-right: 1px solid var(--border-color);
 }
 
 .action-buttons-container {

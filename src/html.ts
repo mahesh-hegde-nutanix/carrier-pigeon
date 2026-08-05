@@ -9,12 +9,15 @@ export function getHtmlForWebview(webview: vscode.Webview, extensionUri: vscode.
     const styleUri = webview.asWebviewUri(
         vscode.Uri.joinPath(extensionUri, 'dist', 'webview.css')
     );
+    const codiconsUri = webview.asWebviewUri(
+        vscode.Uri.joinPath(extensionUri, 'dist', 'codicon.css')
+    );
 
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src ${webview.cspSource}; style-src ${webview.cspSource} 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style nonce="${nonce}">
         body {
@@ -27,14 +30,15 @@ export function getHtmlForWebview(webview: vscode.Webview, extensionUri: vscode.
         }
     </style>
     <link href="${styleUri}" rel="stylesheet">
+    <link href="${codiconsUri}" rel="stylesheet">
     <title>AI Chat</title>
 </head>
 <body class="booting">
     <div class="tab-bar" id="tab-bar">
         <div class="tabs" id="tabs"></div>
-        <button class="tab-btn tab-new" id="tab-new" title="New tab">+ New tab</button>
-        <button class="tab-btn tab-history" id="tab-history" title="History">&#128336;</button>
-        <button class="tab-btn tab-settings" id="tab-settings" title="Settings">&#9881;</button>
+        <button class="tab-btn tab-new" id="tab-new" title="New tab"><i class="codicon codicon-add"></i> New tab</button>
+        <button class="tab-btn tab-history" id="tab-history" title="History"><i class="codicon codicon-history"></i></button>
+        <button class="tab-btn tab-settings" id="tab-settings" title="Settings"><i class="codicon codicon-settings-gear"></i></button>
     </div>
 
     <div class="chat-history" id="chat-history"></div>
@@ -42,15 +46,15 @@ export function getHtmlForWebview(webview: vscode.Webview, extensionUri: vscode.
     <div class="input-area">
         <div class="pending-tools" id="pending-tools"></div>
         <div class="mention-popup" id="mention-popup"></div>
-        <textarea id="chat-input" placeholder="Ask a question, @ mention a file, # find a symbol, or / invoke a skill..." rows="1"></textarea>
+        <textarea id="chat-input" placeholder="Ask a question, @ mention a file, # find a symbol, or / invoke a skill..." rows="4"></textarea>
         <div class="input-bottom-row">
-            <select id="mode-select" class="mode-selector">
-                <option value="edit" selected>&#9998; EDIT MODE</option>
-                <option value="ask">&#128172; ASK MODE</option>
-            </select>
+            <div class="mode-segmented-control" id="mode-segmented-control">
+                <button class="mode-segment-btn active" id="mode-btn-edit" value="edit"><i class="codicon codicon-edit"></i> Edit</button>
+                <button class="mode-segment-btn" id="mode-btn-ask" value="ask"><i class="codicon codicon-comment-discussion"></i> Ask</button>
+            </div>
             <div class="action-buttons-container" id="action-buttons-container" style="margin-left: auto;"></div>
         </div>
-        <div class="input-options-row" style="display: flex; align-items: center; gap: 8px; margin-top: 6px;">
+        <div class="input-options-row" style="display: flex; align-items: center; gap: 8px; margin-top: 14px; margin-bottom: 2px;">
             <label style="font-size: 0.8em; cursor: pointer; display: flex; align-items: center; gap: 4px; color: var(--vscode-descriptionForeground);">
                 <input type="checkbox" id="call-graph-check" /> Include CallGraph (Experimental & slow)
             </label>
@@ -61,7 +65,7 @@ export function getHtmlForWebview(webview: vscode.Webview, extensionUri: vscode.
     <div class="history-overlay" id="history-overlay">
         <div class="history-header">
             <span>History</span>
-            <button class="tab-btn" id="history-close" title="Close">&#10005;</button>
+            <button class="tab-btn" id="history-close" title="Close"><i class="codicon codicon-close"></i></button>
         </div>
         <div class="history-list" id="history-list"></div>
     </div>
@@ -69,7 +73,7 @@ export function getHtmlForWebview(webview: vscode.Webview, extensionUri: vscode.
     <div class="history-overlay" id="settings-overlay">
         <div class="history-header">
             <span>Settings</span>
-            <button class="tab-btn" id="settings-close" title="Close">&#10005;</button>
+            <button class="tab-btn" id="settings-close" title="Close"><i class="codicon codicon-close"></i></button>
         </div>
         <div class="settings-body">
             <label class="settings-label" for="settings-instructions">Custom instructions</label>
