@@ -1,5 +1,3 @@
-import { els } from './dom';
-import { getActive } from './state';
 import { renderTabs } from './tabs';
 import { renderMessages } from './messagesUi';
 import { updateButtons } from './mentions';

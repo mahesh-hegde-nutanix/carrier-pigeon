@@ -1,10 +1,48 @@
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+import * as Diff from 'diff';
 import { ChatSender } from '../shared/session';
 import { els } from './dom';
 import { getActive, saveActive } from './state';
 
 const GREETING = 'Hello! I am your AI coding assistant. Type @ to mention files in this workspace.';
+
+function formatDiffBlocks(html: string): string {
+    // Specifically extract the filename from the first line, then the search and replace blocks.
+    // Also optionally match enclosing <pre><code> tags to prevent double-nesting.
+    const searchReplaceRegex = /(?:<pre><code[^>]*>)?\s*&gt;&gt;&gt; SEARCH *([^\n]*)\n([\s\S]*?)\n===\n([\s\S]*?)\n&lt;&lt;&lt; REPLACE\s*(?:<\/code><\/pre>)?/g;
+    return html.replace(searchReplaceRegex, (match, filename, search, replace) => {
+        try {
+            const diffs = Diff.diffLines(search, replace);
+            if (!diffs || diffs.length === 0) {
+                return match;
+            }
+
+            let result = '<div class="diff-container">';
+            
+            if (filename.trim()) {
+                result += `<div class="diff-header">${filename.trim()}</div>`;
+            }
+
+            result += `<div class="diff-content">`;
+            
+            diffs.forEach(part => {
+                const className = part.added ? 'diff-line diff-added' : part.removed ? 'diff-line diff-removed' : '';
+                if (className) {
+                    result += `<span class="${className}">${part.value}</span>`;
+                } else {
+                    result += `<span>${part.value}</span>`;
+                }
+            });
+            
+            result += '</div></div>';
+            return result;
+        } catch (error) {
+            console.error('Failed to generate diff block, falling back to raw text:', error);
+            return match;
+        }
+    });
+}
 
 export function renderMessages(): void {
     els.chatHistory.innerHTML = '';
@@ -36,7 +74,9 @@ export function updateMessageDom(msgDiv: HTMLElement, text: string, sender: Chat
     const contentDiv = msgDiv.querySelector('.message-content') as HTMLElement;
     if (!contentDiv) return;
     if (sender === 'ai' || sender === 'tool') {
-        contentDiv.innerHTML = DOMPurify.sanitize(marked.parse(text, { async: false }));
+        let html = marked.parse(text, { async: false }) as string;
+        html = formatDiffBlocks(html);
+        contentDiv.innerHTML = DOMPurify.sanitize(html);
     } else {
         contentDiv.textContent = text;
     }
@@ -54,7 +94,9 @@ function renderMessageDom(text: string, sender: ChatSender): HTMLElement {
         const toolClass = sender === 'tool' ? ' tool-output' : '';
         const collapsedClass = isCollapsed ? ' collapsed' : '';
         contentDiv.className = `message-content markdown${toolClass}${collapsedClass}`;
-        contentDiv.innerHTML = DOMPurify.sanitize(marked.parse(text, { async: false }));
+        let html = marked.parse(text, { async: false }) as string;
+        html = formatDiffBlocks(html);
+        contentDiv.innerHTML = DOMPurify.sanitize(html);
     } else {
         contentDiv.className = `message-content${isCollapsed ? ' collapsed' : ''}`;
         contentDiv.textContent = text;

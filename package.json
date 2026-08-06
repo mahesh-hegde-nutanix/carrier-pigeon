@@ -41,6 +41,7 @@
     }
   },
   "dependencies": {
+    "diff": "^9.0.0",
     "@vscode/codicons": "^0.0.45",
     "dompurify": "^3.4.12",
     "marked": "^18.0.7",

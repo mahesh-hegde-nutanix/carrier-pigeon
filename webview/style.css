@@ -247,9 +247,10 @@ textarea:focus {
 }
 
 .message-content.collapsed {
-    display: -webkit-box;
-    -webkit-line-clamp: 10;
-    -webkit-box-orient: vertical;
+    max-height: 150px;
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
 }
 
 .markdown {
@@ -653,4 +654,51 @@ textarea:focus {
 .copy-errors-btn:hover {
     background: var(--vscode-errorForeground);
     color: var(--vscode-editor-background);
+}
+
+/* Diff styles */
+.diff-added {
+    background-color: rgba(46, 160, 67, 0.2);
+    color: var(--vscode-editor-foreground);
+}
+.diff-added.diff-word {
+    background-color: rgba(46, 160, 67, 0.4);
+}
+.diff-removed {
+    background-color: rgba(248, 81, 73, 0.2);
+    color: var(--vscode-editor-foreground);
+}
+.diff-removed.diff-word {
+    background-color: rgba(248, 81, 73, 0.4);
+}
+.diff-container {
+    font-family: var(--vscode-editor-font-family);
+    font-size: var(--vscode-editor-font-size);
+    background: var(--vscode-editor-background);
+    border: 1px solid var(--vscode-widget-border);
+    border-radius: 4px;
+    margin: 8px 0;
+    overflow: hidden;
+}
+.diff-header {
+    padding: 6px 12px;
+    background: var(--vscode-sideBarSectionHeader-background, rgba(127, 127, 127, 0.15));
+    border-bottom: 1px solid var(--vscode-widget-border);
+    font-family: var(--vscode-font-family, sans-serif);
+    font-size: 0.9em;
+    font-weight: 600;
+    color: var(--vscode-sideBarTitle-foreground, inherit);
+    letter-spacing: 0.5px;
+}
+.diff-content {
+    padding: 8px;
+    white-space: pre-wrap;
+    overflow-x: auto;
+}
+.diff-line {
+    display: inline-block;
+    min-width: calc(100% + 16px);
+    margin: 0 -8px;
+    padding: 0 8px;
+    box-sizing: border-box;
 }
