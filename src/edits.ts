@@ -44,8 +44,10 @@ export async function applyEdits(edits: EditCall[], sessionFiles: string[]): Pro
                 continue;
             }
             
-            workspaceEdit.createFile(newUri, { ignoreIfExists: true });
-            workspaceEdit.insert(newUri, new vscode.Position(0, 0), edit.replace);
+            workspaceEdit.createFile(newUri, { 
+                ignoreIfExists: true,
+                contents: Buffer.from(edit.replace, 'utf8')
+            });
             if (!editedUris.some(u => u.toString() === newUri.toString())) editedUris.push(newUri);
             continue;
         }

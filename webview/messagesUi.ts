@@ -5,7 +5,6 @@ import { els } from './dom';
 import { getActive, saveActive } from './state';
 
 const GREETING = 'Hello! I am your AI coding assistant. Type @ to mention files in this workspace.';
-const COLLAPSE_LINE_LIMIT = 10;
 
 export function renderMessages(): void {
     els.chatHistory.innerHTML = '';
@@ -48,32 +47,31 @@ function renderMessageDom(text: string, sender: ChatSender): HTMLElement {
     const msgDiv = document.createElement('div');
     msgDiv.className = 'message ' + sender;
 
+    const isCollapsed = sender !== 'ai';
     const contentDiv = document.createElement('div');
+
     if (sender === 'ai' || sender === 'tool') {
-        // AI and tool replies are markdown; render and sanitize them for readability.
-        contentDiv.className = `message-content markdown ${sender === 'tool' ? 'tool-output' : ''}`;
+        const toolClass = sender === 'tool' ? ' tool-output' : '';
+        const collapsedClass = isCollapsed ? ' collapsed' : '';
+        contentDiv.className = `message-content markdown${toolClass}${collapsedClass}`;
         contentDiv.innerHTML = DOMPurify.sanitize(marked.parse(text, { async: false }));
-        msgDiv.appendChild(contentDiv);
     } else {
-        // User messages are large context/result payloads; keep them plain and
-        // collapsible.
-        contentDiv.className = 'message-content collapsed';
+        contentDiv.className = `message-content${isCollapsed ? ' collapsed' : ''}`;
         contentDiv.textContent = text;
-        msgDiv.appendChild(contentDiv);
-        if (text.split('\n').length > COLLAPSE_LINE_LIMIT) {
-            msgDiv.appendChild(makeToggle(contentDiv));
-        }
     }
+
+    msgDiv.appendChild(contentDiv);
+    msgDiv.appendChild(makeToggle(contentDiv, isCollapsed));
 
     els.chatHistory.appendChild(msgDiv);
     els.chatHistory.scrollTop = els.chatHistory.scrollHeight;
     return msgDiv;
 }
 
-function makeToggle(contentDiv: HTMLElement): HTMLElement {
+function makeToggle(contentDiv: HTMLElement, isCollapsed: boolean): HTMLElement {
     const toggleBtn = document.createElement('div');
     toggleBtn.className = 'toggle-btn';
-    toggleBtn.textContent = 'Show more';
+    toggleBtn.textContent = isCollapsed ? 'Show more' : 'Show less';
     toggleBtn.onclick = () => {
         const collapsed = contentDiv.classList.toggle('collapsed');
         toggleBtn.textContent = collapsed ? 'Show more' : 'Show less';
